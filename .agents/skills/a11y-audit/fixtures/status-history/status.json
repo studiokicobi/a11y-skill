@@ -1,0 +1,166 @@
+{
+  "records": [
+    {
+      "status": "fixed",
+      "finding": {
+        "id": "hist-fixed-001",
+        "rule_id": "target-blank-no-noopener",
+        "title": "target=\"_blank\" without rel=\"noopener\"",
+        "wcag": [
+          "best-practice"
+        ],
+        "severity": "moderate",
+        "scanner": "static",
+        "scanner_version": "2.1.1",
+        "detected_at": "2025-12-15T08:00:00Z",
+        "triage_group": "autofix",
+        "fix_safety": "safe",
+        "confidence": "high",
+        "status": "open",
+        "waiver": null,
+        "group_reason": "Rule is classified as safe to patch automatically for this evidence source.",
+        "location": {
+          "file": "fixtures/status-history/index.html",
+          "line": 9,
+          "column": 3,
+          "url": "",
+          "selector": "",
+          "journey_step_id": ""
+        },
+        "mapping": {
+          "source_file": "",
+          "source_line": 0,
+          "confidence": "low",
+          "explanation": ""
+        },
+        "evidence": {
+          "snippet": "<a href=\"https://example.com\" target=\"_blank\">Docs</a>",
+          "dom_snippet": "",
+          "screenshot": "",
+          "axe_help_url": ""
+        },
+        "decision_required": {
+          "question": "",
+          "options": []
+        },
+        "proposed_fix": {
+          "kind": "diff",
+          "diff": "```diff\n- <a href=\"https://example.com\" target=\"_blank\">Docs</a>\n+ <a href=\"https://example.com\" target=\"_blank\" rel=\"noopener noreferrer\">Docs</a>\n```",
+          "notes": ""
+        },
+        "fingerprint": "history|fixed|targetblank",
+        "confirmed_by": [
+          "static"
+        ]
+      }
+    },
+    {
+      "status": "resolved",
+      "finding": {
+        "id": "hist-resolved-001",
+        "rule_id": "heading-order",
+        "title": "Heading order skip",
+        "wcag": [
+          "2.4.6"
+        ],
+        "severity": "moderate",
+        "scanner": "runtime",
+        "scanner_version": "2.1.1",
+        "detected_at": "2025-12-20T10:30:00Z",
+        "triage_group": "needs_input",
+        "fix_safety": "input-required",
+        "confidence": "medium",
+        "status": "open",
+        "waiver": null,
+        "group_reason": "Finding requires human input, content intent, or scanner uncertainty before remediation.",
+        "location": {
+          "file": "",
+          "line": 0,
+          "column": 0,
+          "url": "http://localhost:3000/settings",
+          "selector": "main > h3",
+          "journey_step_id": ""
+        },
+        "mapping": {
+          "source_file": "",
+          "source_line": 0,
+          "confidence": "low",
+          "explanation": ""
+        },
+        "evidence": {
+          "snippet": "",
+          "dom_snippet": "<h3>Settings</h3>",
+          "screenshot": "",
+          "axe_help_url": ""
+        },
+        "decision_required": {
+          "question": "Should the out-of-order heading be downgraded/upgraded to match the sequence, or should we restructure the page hierarchy?",
+          "options": []
+        },
+        "proposed_fix": {
+          "kind": "none",
+          "diff": "",
+          "notes": ""
+        },
+        "fingerprint": "history|resolved|heading-order",
+        "confirmed_by": [
+          "runtime"
+        ]
+      }
+    },
+    {
+      "status": "stale",
+      "finding": {
+        "id": "hist-stale-001",
+        "rule_id": "input-missing-label",
+        "title": "Input missing label",
+        "wcag": [
+          "3.3.2"
+        ],
+        "severity": "serious",
+        "scanner": "static",
+        "scanner_version": "2.1.1",
+        "detected_at": "2025-12-22T14:15:00Z",
+        "triage_group": "needs_input",
+        "fix_safety": "input-required",
+        "confidence": "high",
+        "status": "open",
+        "waiver": null,
+        "group_reason": "Finding requires human input, content intent, or scanner uncertainty before remediation.",
+        "location": {
+          "file": "fixtures/status-history/form.html",
+          "line": 18,
+          "column": 3,
+          "url": "",
+          "selector": "",
+          "journey_step_id": ""
+        },
+        "mapping": {
+          "source_file": "",
+          "source_line": 0,
+          "confidence": "low",
+          "explanation": ""
+        },
+        "evidence": {
+          "snippet": "<input type=\"email\" name=\"work_email\">",
+          "dom_snippet": "",
+          "screenshot": "",
+          "axe_help_url": ""
+        },
+        "decision_required": {
+          "question": "What should this input be labeled?",
+          "options": []
+        },
+        "proposed_fix": {
+          "kind": "none",
+          "diff": "",
+          "notes": ""
+        },
+        "fingerprint": "history|stale|input-label",
+        "confirmed_by": [
+          "static"
+        ]
+      }
+    }
+  ]
+}

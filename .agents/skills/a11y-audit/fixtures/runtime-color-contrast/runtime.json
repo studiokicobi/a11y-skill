@@ -1,0 +1,32 @@
+{
+  "scanner": "runtime",
+  "urls": [
+    "http://localhost:3000"
+  ],
+  "per_url_counts": {
+    "http://localhost:3000": 1
+  },
+  "issue_count": 1,
+  "issues": [
+    {
+      "rule_id": "color-contrast",
+      "origin_rule_id": "color-contrast",
+      "wcag": "1.4.3",
+      "file": "http://localhost:3000",
+      "line": 0,
+      "col": 0,
+      "snippet": "<p class=\"muted-copy\">Low contrast helper text</p>",
+      "message": "Elements must meet minimum color contrast ratio thresholds",
+      "framework": "runtime",
+      "triage_hint": "input",
+      "fix_data": {
+        "axe_rule": "color-contrast",
+        "impact": "serious",
+        "target": "main > p.muted-copy",
+        "help_url": "https://dequeuniversity.com/rules/axe/4.10/color-contrast",
+        "failure_summary": "Fix any of the following:\n  Element has insufficient color contrast of 2.85 (foreground color: #999999, background color: #ffffff, font size: 14pt (18.66px), font weight: normal). Expected contrast ratio of 4.5:1",
+        "result_type": "violation"
+      }
+    }
+  ]
+}

@@ -1,0 +1,7 @@
+{
+  "name": "react-multiline-fixture",
+  "dependencies": {
+    "react": "^18.0.0",
+    "next": "^14.0.0"
+  }
+}

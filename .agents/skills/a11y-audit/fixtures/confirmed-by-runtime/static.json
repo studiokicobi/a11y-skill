@@ -1,0 +1,20 @@
+{
+  "target": "fixtures/confirmed-by-runtime",
+  "framework": "html",
+  "files_scanned": 1,
+  "issue_count": 1,
+  "issues": [
+    {
+      "rule_id": "img-missing-alt",
+      "wcag": "1.1.1",
+      "file": "fixtures/confirmed-by-runtime/index.html",
+      "line": 12,
+      "col": 3,
+      "snippet": "<img src=\"/logo.png\">",
+      "message": "Image is missing an alt attribute.",
+      "framework": "html",
+      "triage_hint": "input",
+      "fix_data": {}
+    }
+  ]
+}

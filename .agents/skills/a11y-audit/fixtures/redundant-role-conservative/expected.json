@@ -1,0 +1,14 @@
+{
+  "framework": "html",
+  "files_scanned": 1,
+  "issue_count": 1,
+  "issues": [
+    {
+      "rule_id": "redundant-role",
+      "wcag": "4.1.2",
+      "file": "fixtures/redundant-role-conservative/index.html",
+      "line": 4,
+      "triage_hint": "auto"
+    }
+  ]
+}

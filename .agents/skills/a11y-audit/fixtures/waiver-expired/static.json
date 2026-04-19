@@ -1,0 +1,22 @@
+{
+  "target": "fixtures/waiver-expired",
+  "framework": "html",
+  "files_scanned": 1,
+  "issue_count": 1,
+  "issues": [
+    {
+      "rule_id": "target-blank-no-noopener",
+      "wcag": "best-practice",
+      "file": "fixtures/waiver-expired/index.html",
+      "line": 9,
+      "col": 3,
+      "snippet": "<a href=\"https://example.com\" target=\"_blank\" rel=\"external\">Docs</a>",
+      "message": "target=\"_blank\" without rel=\"noopener noreferrer\". Security and sometimes accessibility issue.",
+      "framework": "html",
+      "triage_hint": "auto",
+      "fix_data": {
+        "pattern": "add_rel_noopener"
+      }
+    }
+  ]
+}

@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>Accessible Page</title>
+</head>
+<body>
+  <a href="#main" class="sr-only-focusable">Skip to main content</a>
+  <nav aria-label="Main navigation">
+    <a href="/about">About</a>
+    <a href="https://example.com" target="_blank" rel="noopener noreferrer">External</a>
+  </nav>
+  <main id="main">
+    <img src="/hero.jpg" alt="Team collaborating">
+    <form>
+      <label for="email">Email</label>
+      <input id="email" type="email" autocomplete="email">
+
+      <label for="password">Password</label>
+      <input id="password" type="password" autocomplete="current-password">
+
+      <button type="submit">Sign in</button>
+    </form>
+    <button type="button" onclick="openMenu()">Menu</button>
+  </main>
+</body>
+</html>

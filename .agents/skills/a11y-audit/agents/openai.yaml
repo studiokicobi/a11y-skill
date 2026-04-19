@@ -1,0 +1,44 @@
+# Codex Agent Skills metadata for a11y-audit.
+# See https://developers.openai.com/codex/skills for spec.
+
+interface:
+  display_name: "Accessibility Audit (WCAG 2.2 AA)"
+  short_description: "Audit a codebase or live URL for WCAG 2.2 AA issues; produces a triaged report grouped by fix autonomy."
+  brand_color: "#005FCC"
+  default_prompt: "Run an accessibility audit on this project and produce the triaged report."
+
+policy:
+  # Implicit invocation is enabled — the skill should trigger whenever the
+  # user mentions accessibility, a11y, WCAG, screen readers, keyboard nav,
+  # color contrast, or ARIA. This matches the trigger surface described in
+  # SKILL.md's description.
+  allow_implicit_invocation: true
+
+dependencies:
+  # Static scanner and triage are Python stdlib only.
+  # Runtime scanner needs Node.js, Puppeteer (downloads a Chromium build on
+  # first install), and axe-core. The runtime script auto-installs these into
+  # a local .a11y-audit-deps/ directory on first use, so no manual setup is
+  # required, but the host needs Node and npm available.
+  runtimes:
+    - type: python
+      min_version: "3.8"
+      reason: "Static scanner (a11y_scan.py), triage (triage.py), contrast checker (contrast_checker.py). Uses standard library only."
+
+    - type: node
+      min_version: "18"
+      optional: true
+      reason: "Runtime scanner (a11y_runtime.js). Only needed when auditing live URLs; static scans work without Node."
+
+  packages:
+    - type: npm
+      name: puppeteer
+      optional: true
+      auto_install: true
+      reason: "Headless Chromium driver for the runtime scan. Auto-installed on first run of a11y_runtime.js into .a11y-audit-deps/."
+
+    - type: npm
+      name: axe-core
+      optional: true
+      auto_install: true
+      reason: "WCAG rule engine injected into the page by the runtime scanner. Auto-installed alongside Puppeteer."

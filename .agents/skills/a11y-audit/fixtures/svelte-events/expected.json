@@ -1,0 +1,14 @@
+{
+  "framework": "svelte",
+  "files_scanned": 1,
+  "issue_count": 1,
+  "issues": [
+    {
+      "rule_id": "clickable-div",
+      "wcag": "2.1.1",
+      "file": "fixtures/svelte-events/Component.svelte",
+      "line": 5,
+      "triage_hint": "auto"
+    }
+  ]
+}

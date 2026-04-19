@@ -1,0 +1,13 @@
+<div class="dashboard">
+  <h1>Dashboard</h1>
+  <img [src]="user.avatar">
+  <nav role="navigation">
+    <a [routerLink]="['/profile']">Profile</a>
+  </nav>
+  <div
+    (click)="handleAction()"
+    class="action-card">
+    Take action
+  </div>
+  <input type="text" placeholder="Search" [(ngModel)]="query">
+</div>

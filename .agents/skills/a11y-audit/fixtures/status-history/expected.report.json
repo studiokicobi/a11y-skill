@@ -1,0 +1,269 @@
+{
+  "schema_version": "2.1.1",
+  "generated_at": "2026-01-02T03:04:05Z",
+  "target": "fixtures/status-history",
+  "framework": "html",
+  "standard": "WCAG 2.2 Level AA",
+  "summary": {
+    "scanner_detected_issue_count": 0,
+    "auto_fixable_count": 0,
+    "needs_input_count": 0,
+    "manual_review_count": 0,
+    "waived_count": 0,
+    "not_checked_count": 9,
+    "by_scanner": {
+      "static": 0,
+      "runtime": 0,
+      "stateful": 0,
+      "manual-template": 0,
+      "token": 0
+    },
+    "by_confidence": {
+      "high": 0,
+      "medium": 0,
+      "low": 0
+    },
+    "status_counts": {
+      "open": 0,
+      "waived": 0,
+      "fixed": 1,
+      "resolved": 1,
+      "stale": 1
+    }
+  },
+  "coverage_metadata": {
+    "coverage_source": "references/wcag_coverage.md",
+    "manual_checklist_included": true,
+    "not_checked_criteria": [
+      "1.2.1",
+      "1.2.2",
+      "1.2.3",
+      "1.2.4",
+      "1.2.5",
+      "1.4.2",
+      "2.2.1",
+      "2.2.2",
+      "2.3.1"
+    ]
+  },
+  "findings": [
+    {
+      "id": "hist-fixed-001",
+      "rule_id": "target-blank-no-noopener",
+      "title": "target=\"_blank\" without rel=\"noopener\"",
+      "wcag": [
+        "best-practice"
+      ],
+      "severity": "moderate",
+      "scanner": "static",
+      "scanner_version": "2.1.1",
+      "detected_at": "2025-12-15T08:00:00Z",
+      "triage_group": "autofix",
+      "fix_safety": "safe",
+      "confidence": "high",
+      "status": "fixed",
+      "group_reason": "Finding status is fixed; it is tracked for reporting but not surfaced in active remediation groups.",
+      "location": {
+        "file": "fixtures/status-history/index.html",
+        "line": 9,
+        "column": 3,
+        "url": "",
+        "selector": "",
+        "journey_step_id": ""
+      },
+      "evidence": {
+        "snippet": "<a href=\"https://example.com\" target=\"_blank\">Docs</a>",
+        "dom_snippet": "",
+        "screenshot": "",
+        "axe_help_url": ""
+      },
+      "decision_required": {
+        "question": "",
+        "options": []
+      },
+      "proposed_fix": {
+        "kind": "diff",
+        "diff": "```diff\n- <a href=\"https://example.com\" target=\"_blank\">Docs</a>\n+ <a href=\"https://example.com\" target=\"_blank\" rel=\"noopener noreferrer\">Docs</a>\n```",
+        "notes": ""
+      },
+      "fingerprint": "history|fixed|targetblank",
+      "confirmed_by": [
+        "static"
+      ],
+      "waiver": null
+    },
+    {
+      "id": "hist-resolved-001",
+      "rule_id": "heading-order",
+      "title": "Heading order skip",
+      "wcag": [
+        "2.4.6"
+      ],
+      "severity": "moderate",
+      "scanner": "runtime",
+      "scanner_version": "2.1.1",
+      "detected_at": "2025-12-20T10:30:00Z",
+      "triage_group": "needs_input",
+      "fix_safety": "input-required",
+      "confidence": "medium",
+      "status": "resolved",
+      "group_reason": "Finding status is resolved; it is tracked for reporting but not surfaced in active remediation groups.",
+      "location": {
+        "file": "",
+        "line": 0,
+        "column": 0,
+        "url": "http://localhost:3000/settings",
+        "selector": "main > h3",
+        "journey_step_id": ""
+      },
+      "evidence": {
+        "snippet": "",
+        "dom_snippet": "<h3>Settings</h3>",
+        "screenshot": "",
+        "axe_help_url": ""
+      },
+      "decision_required": {
+        "question": "Should the out-of-order heading be downgraded/upgraded to match the sequence, or should we restructure the page hierarchy?",
+        "options": []
+      },
+      "proposed_fix": {
+        "kind": "none",
+        "diff": "",
+        "notes": ""
+      },
+      "fingerprint": "history|resolved|heading-order",
+      "confirmed_by": [
+        "runtime"
+      ],
+      "waiver": null
+    },
+    {
+      "id": "hist-stale-001",
+      "rule_id": "input-missing-label",
+      "title": "Input missing label",
+      "wcag": [
+        "3.3.2"
+      ],
+      "severity": "serious",
+      "scanner": "static",
+      "scanner_version": "2.1.1",
+      "detected_at": "2025-12-22T14:15:00Z",
+      "triage_group": "needs_input",
+      "fix_safety": "input-required",
+      "confidence": "high",
+      "status": "stale",
+      "group_reason": "Finding status is stale; it is tracked for reporting but not surfaced in active remediation groups.",
+      "location": {
+        "file": "fixtures/status-history/form.html",
+        "line": 18,
+        "column": 3,
+        "url": "",
+        "selector": "",
+        "journey_step_id": ""
+      },
+      "evidence": {
+        "snippet": "<input type=\"email\" name=\"work_email\">",
+        "dom_snippet": "",
+        "screenshot": "",
+        "axe_help_url": ""
+      },
+      "decision_required": {
+        "question": "What should this input be labeled?",
+        "options": []
+      },
+      "proposed_fix": {
+        "kind": "none",
+        "diff": "",
+        "notes": ""
+      },
+      "fingerprint": "history|stale|input-label",
+      "confirmed_by": [
+        "static"
+      ],
+      "waiver": null
+    }
+  ],
+  "not_checked": [
+    {
+      "rule_id": "not-checked-1-2-1",
+      "title": "Audio-only and Video-only (Prerecorded)",
+      "wcag": [
+        "1.2.1"
+      ],
+      "status": "open",
+      "notes": "Media asset review required."
+    },
+    {
+      "rule_id": "not-checked-1-2-2",
+      "title": "Captions (Prerecorded)",
+      "wcag": [
+        "1.2.2"
+      ],
+      "status": "open",
+      "notes": "Media asset review required."
+    },
+    {
+      "rule_id": "not-checked-1-2-3",
+      "title": "Audio Description or Media Alternative (Prerecorded)",
+      "wcag": [
+        "1.2.3"
+      ],
+      "status": "open",
+      "notes": "Media asset review required."
+    },
+    {
+      "rule_id": "not-checked-1-2-4",
+      "title": "Captions (Live)",
+      "wcag": [
+        "1.2.4"
+      ],
+      "status": "open",
+      "notes": "Live media review required."
+    },
+    {
+      "rule_id": "not-checked-1-2-5",
+      "title": "Audio Description (Prerecorded)",
+      "wcag": [
+        "1.2.5"
+      ],
+      "status": "open",
+      "notes": "Media asset review required."
+    },
+    {
+      "rule_id": "not-checked-1-4-2",
+      "title": "Audio Control",
+      "wcag": [
+        "1.4.2"
+      ],
+      "status": "open",
+      "notes": "Static autoplay checks are partial and do not verify controls."
+    },
+    {
+      "rule_id": "not-checked-2-2-1",
+      "title": "Timing Adjustable",
+      "wcag": [
+        "2.2.1"
+      ],
+      "status": "open",
+      "notes": "Flow and session review required."
+    },
+    {
+      "rule_id": "not-checked-2-2-2",
+      "title": "Pause, Stop, Hide",
+      "wcag": [
+        "2.2.2"
+      ],
+      "status": "open",
+      "notes": "Flow and motion review required."
+    },
+    {
+      "rule_id": "not-checked-2-3-1",
+      "title": "Three Flashes or Below Threshold",
+      "wcag": [
+        "2.3.1"
+      ],
+      "status": "open",
+      "notes": "Visual review required."
+    }
+  ]
+}

@@ -1,0 +1,35 @@
+{
+  "framework": "nextjs",
+  "files_scanned": 1,
+  "issue_count": 4,
+  "issues": [
+    {
+      "rule_id": "img-missing-alt",
+      "wcag": "1.1.1",
+      "file": "fixtures/react-multiline/ProductCard.tsx",
+      "line": 6,
+      "triage_hint": "input"
+    },
+    {
+      "rule_id": "clickable-div",
+      "wcag": "2.1.1",
+      "file": "fixtures/react-multiline/ProductCard.tsx",
+      "line": 11,
+      "triage_hint": "auto"
+    },
+    {
+      "rule_id": "outline-none",
+      "wcag": "2.4.7",
+      "file": "fixtures/react-multiline/ProductCard.tsx",
+      "line": 20,
+      "triage_hint": "auto"
+    },
+    {
+      "rule_id": "tailwind-low-contrast",
+      "wcag": "1.4.3",
+      "file": "fixtures/react-multiline/ProductCard.tsx",
+      "line": 26,
+      "triage_hint": "auto"
+    }
+  ]
+}

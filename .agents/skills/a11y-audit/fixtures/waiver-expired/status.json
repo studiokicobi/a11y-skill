@@ -1,0 +1,14 @@
+{
+  "waivers": [
+    {
+      "match": {
+        "rule_id": "target-blank-no-noopener",
+        "file": "fixtures/waiver-expired/index.html",
+        "line": 9
+      },
+      "reason": "This waiver should have expired before the fixture timestamp.",
+      "approved_by": "a11y-lead",
+      "expires_at": "2025-12-31T00:00:00Z"
+    }
+  ]
+}

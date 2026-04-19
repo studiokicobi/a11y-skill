@@ -1,0 +1,28 @@
+{
+  "framework": "html",
+  "files_scanned": 1,
+  "issue_count": 3,
+  "issues": [
+    {
+      "rule_id": "css-low-contrast",
+      "wcag": "1.4.3",
+      "file": "fixtures/css-contrast/styles.css",
+      "line": 2,
+      "triage_hint": "auto"
+    },
+    {
+      "rule_id": "css-low-contrast",
+      "wcag": "1.4.3",
+      "file": "fixtures/css-contrast/styles.css",
+      "line": 7,
+      "triage_hint": "auto"
+    },
+    {
+      "rule_id": "css-low-contrast",
+      "wcag": "1.4.3",
+      "file": "fixtures/css-contrast/styles.css",
+      "line": 11,
+      "triage_hint": "auto"
+    }
+  ]
+}

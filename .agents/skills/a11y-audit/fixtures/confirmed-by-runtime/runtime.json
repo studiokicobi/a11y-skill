@@ -1,0 +1,31 @@
+{
+  "scanner": "runtime",
+  "urls": [
+    "http://localhost:3000"
+  ],
+  "per_url_counts": {
+    "http://localhost:3000": 1
+  },
+  "issue_count": 1,
+  "issues": [
+    {
+      "rule_id": "img-missing-alt",
+      "origin_rule_id": "image-alt",
+      "wcag": "1.1.1",
+      "file": "http://localhost:3000",
+      "line": 0,
+      "col": 0,
+      "snippet": "<img src=\"/logo.png\">",
+      "message": "Images must have alternate text.",
+      "framework": "runtime",
+      "triage_hint": "input",
+      "fix_data": {
+        "axe_rule": "image-alt",
+        "impact": "serious",
+        "target": "main > img.brand-logo",
+        "help_url": "https://dequeuniversity.com/rules/axe/4.10/image-alt",
+        "result_type": "violation"
+      }
+    }
+  ]
+}
