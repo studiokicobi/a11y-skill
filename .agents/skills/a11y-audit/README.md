@@ -87,6 +87,12 @@ python3 scripts/triage.py --static /tmp/static.json --tokens /tmp/tokens.json --
 # Or build a baseline from an existing normalized report
 python3 scripts/baseline.py --report report.json --output baseline.json
 
+# Render a CI/PR summary and use CI exit codes
+python3 scripts/cli.py --static /tmp/static.json --runtime /tmp/runtime.json --baseline-file baseline.json --pr-summary-output pr-summary.md --ci
+
+# Render a PR summary from an existing normalized report
+python3 scripts/report.py --report report.json --summary-output pr-summary.md --ci
+
 # Color contrast check
 python3 scripts/contrast_checker.py --fg "#999" --bg "#fff" --suggest
 ```
@@ -101,7 +107,7 @@ The output is markdown with three sections in this order:
 
 Plus a "Not checked" section listing WCAG criteria that no automated tool can evaluate, so you know the gaps.
 
-When `--json-output` is used, the normalized report includes deterministic `not_checked` findings, status and waiver metadata, `group_reason`, `fingerprint`, `fingerprint_data`, optional `blast_radius`, `baseline_comparison`, and `confirmed_by`.
+When `--json-output` is used, the normalized report includes deterministic `not_checked` findings, status and waiver metadata, `group_reason`, `fingerprint`, `fingerprint_data`, `mapping`, optional `blast_radius`, `baseline_comparison`, and `confirmed_by`.
 
 ## Baselines and waivers
 
@@ -113,6 +119,34 @@ The normalized JSON report is the source for repeatable regression tracking.
 - Token findings use `rule_id + file + token anchor` fingerprints so design-system issues survive line movement in the token file.
 - Line-fallback fingerprints are marked `unstable: true` so a disappeared match becomes `stale` rather than being overclaimed as `fixed`.
 - Use `--status-file` on `triage.py` to carry waiver and administrative status records across runs.
+
+## Source mapping and CI mode
+
+Runtime and stateful findings now carry a `mapping` object with confidence and explanation.
+
+- Static findings map directly to the scanned source file and line with `high` confidence.
+- Token findings map directly to the token file with `high` confidence.
+- Runtime/stateful findings currently map using narrow debug-only hints:
+  - `data-source-loc`
+  - `data-source-file` plus `data-source-line`
+  - `data-component-file` / `data-component-line`
+  - `data-component-stack` values that include `path:line`
+- If no mapping hints are present, runtime/stateful findings stay `low` confidence and are excluded from changed-files scoping.
+
+`cli.py` adds CI-oriented behavior:
+
+- `--changed-files` scopes the report to the listed source files using `mapping.source_file` or direct source locations.
+- `--pr-summary-output` writes GitHub-friendly markdown.
+- `--ci` returns deterministic exit codes:
+  - `0` no blocking findings
+  - `1` blocking findings at the configured threshold
+  - `2` configuration/runtime error
+  - `3` baseline error
+- Default CI threshold is:
+  - severity `serious` or higher
+  - confidence `high`
+  - when baseline is present, only `new` findings block by default
+  - manual-review findings do not block unless `--fail-on-manual-findings` is set
 
 ## Runtime config
 

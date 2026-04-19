@@ -1,5 +1,5 @@
 {
-  "schema_version": "2.4.0",
+  "schema_version": "2.5.0",
   "generated_at": "2026-01-02T03:04:05Z",
   "target": "fixtures/status-history",
   "framework": "html",
@@ -83,6 +83,12 @@
         "selector": "",
         "journey_step_id": ""
       },
+      "mapping": {
+        "source_file": "",
+        "source_line": 0,
+        "confidence": "low",
+        "explanation": ""
+      },
       "evidence": {
         "snippet": "<a href=\"https://example.com\" target=\"_blank\">Docs</a>",
         "dom_snippet": "",
@@ -128,6 +134,12 @@
         "selector": "main > h3",
         "journey_step_id": ""
       },
+      "mapping": {
+        "source_file": "",
+        "source_line": 0,
+        "confidence": "low",
+        "explanation": ""
+      },
       "evidence": {
         "snippet": "",
         "dom_snippet": "<h3>Settings</h3>",
@@ -172,6 +184,12 @@
         "url": "",
         "selector": "",
         "journey_step_id": ""
+      },
+      "mapping": {
+        "source_file": "",
+        "source_line": 0,
+        "confidence": "low",
+        "explanation": ""
       },
       "evidence": {
         "snippet": "<input type=\"email\" name=\"work_email\">",

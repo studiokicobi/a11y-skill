@@ -29,6 +29,8 @@ Treat `a11y-audit.skill` as a distributable artifact, not the file to edit direc
 - Run a token scanner smoke test: `python3 .agents/skills/a11y-audit/scripts/tokens.py .agents/skills/a11y-audit/fixtures/token-contrast/tokens.json --output /tmp/a11y-tokens.json`
 - Build a baseline from a normalized JSON report: `python3 .agents/skills/a11y-audit/scripts/baseline.py --report /tmp/a11y-report.json --output /tmp/a11y-baseline.json`
 - Compare a scan against a saved baseline: `python3 .agents/skills/a11y-audit/scripts/triage.py --static /tmp/a11y-static.json --tokens /tmp/a11y-tokens.json --json-output /tmp/a11y-report.json --baseline-file /tmp/a11y-baseline.json`
+- Render a CI/PR summary and exit with CI codes: `python3 .agents/skills/a11y-audit/scripts/cli.py --runtime /tmp/a11y-runtime.json --baseline-file /tmp/a11y-baseline.json --pr-summary-output /tmp/a11y-pr-summary.md --ci`
+- Render a PR summary from an existing normalized report: `python3 .agents/skills/a11y-audit/scripts/report.py --report /tmp/a11y-report.json --summary-output /tmp/a11y-pr-summary.md --ci`
 - Run a runtime script syntax check: `node --check .agents/skills/a11y-audit/scripts/a11y_runtime.js`
 - Run a stateful script syntax check: `node --check .agents/skills/a11y-audit/scripts/a11y_stateful.js`
 - Run the browser-backed fixture suite when browser launch is available: `python3 .agents/skills/a11y-audit/fixtures/run_fixtures.py --live-runtime`

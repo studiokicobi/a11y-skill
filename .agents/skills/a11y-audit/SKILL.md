@@ -103,6 +103,18 @@ To save a fresh baseline after a confirmed run:
 python3 scripts/baseline.py --report /tmp/a11y-report.json --output baseline.json
 ```
 
+For CI or PR workflows, use the orchestrator:
+```bash
+python3 scripts/cli.py \
+  --static /tmp/a11y-static.json \
+  --runtime /tmp/a11y-runtime.json \
+  --baseline-file baseline.json \
+  --changed-files changed-files.txt \
+  --pr-summary-output pr-summary.md \
+  --ci
+```
+By default, CI blocks on new `serious` or `critical` findings with `high` confidence. Manual-review findings stay non-blocking unless explicitly opted in.
+
 ### Step 4: Present the report
 
 Show the report to the user. Lead with a one-line summary:
@@ -152,6 +164,8 @@ The skill honestly splits coverage into three tiers. Don't claim more than this.
 - best-practice — `target="_blank"` without `rel="noopener noreferrer"`
 
 **Runtime scanner (axe-core via `a11y_runtime.js`):** runs the full axe-core rule set tagged `wcag2a`, `wcag2aa`, `wcag21a`, `wcag21aa`, `wcag22a`, `wcag22aa`, and `best-practice`. This includes computed color contrast, focus management, ARIA state after hydration, landmark regions, heading order, live regions, target size (WCAG 2.2 — 2.5.8), and many more. Axe-incomplete results (checks axe couldn't fully verify) are routed to Group 2 for manual confirmation.
+
+When runtime/stateful DOM snippets expose debug source hints such as `data-source-file`, `data-source-line`, `data-source-loc`, or `data-component-stack`, the normalized report maps those findings back to likely source files with `high` or `medium` confidence. Without those hints, runtime/stateful mapping remains `low` confidence and should stay informational.
 
 **Stateful scanner (`a11y_stateful.js`):** runs Playwright journeys described in `references/journey_schema.md`, executes `click`, `press`, `fill`, `select`, `navigate`, and `assert` steps, and performs checkpoint axe scans after selected steps. Findings preserve `journey_step_id`, and the raw output records focus transitions, step failures, and checkpoint screenshots.
 

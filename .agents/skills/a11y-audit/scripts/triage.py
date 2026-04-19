@@ -26,7 +26,7 @@ from typing import Dict, Iterable, List, Optional, Tuple
 from baseline import FINGERPRINT_VERSION, build_baseline, compare_findings, load_baseline
 
 
-SCANNER_VERSION = "2.4.0"
+SCANNER_VERSION = "2.5.0"
 STANDARD = "WCAG 2.2 Level AA"
 DEFAULT_CONFIDENCE = "medium"
 REPORT_GROUPS = ("autofix", "needs_input", "manual_review", "not_checked")
@@ -41,6 +41,16 @@ ID_ATTR_RE = re.compile(r'\bid\s*=\s*["\']([^"\']+)["\']', re.IGNORECASE)
 DATA_TESTID_ATTR_RE = re.compile(r'\bdata-testid\s*=\s*["\']([^"\']+)["\']', re.IGNORECASE)
 NAME_ATTR_RE = re.compile(r'\bname\s*=\s*["\']([^"\']+)["\']', re.IGNORECASE)
 HEADING_TAG_RE = re.compile(r"<h([1-6])\b[^>]*>(.*?)</h\1>", re.IGNORECASE | re.DOTALL)
+SOURCE_LOC_ATTR_RE = re.compile(r'\bdata-source-loc\s*=\s*["\']([^"\']+)["\']', re.IGNORECASE)
+SOURCE_FILE_ATTR_RE = re.compile(r'\bdata-source-file\s*=\s*["\']([^"\']+)["\']', re.IGNORECASE)
+SOURCE_LINE_ATTR_RE = re.compile(r'\bdata-source-line\s*=\s*["\'](\d+)["\']', re.IGNORECASE)
+SOURCE_COLUMN_ATTR_RE = re.compile(r'\bdata-source-(?:column|col)\s*=\s*["\'](\d+)["\']', re.IGNORECASE)
+COMPONENT_FILE_ATTR_RE = re.compile(r'\bdata-component-file\s*=\s*["\']([^"\']+)["\']', re.IGNORECASE)
+COMPONENT_LINE_ATTR_RE = re.compile(r'\bdata-component-line\s*=\s*["\'](\d+)["\']', re.IGNORECASE)
+COMPONENT_STACK_ATTR_RE = re.compile(r'\bdata-component-stack\s*=\s*["\']([^"\']+)["\']', re.IGNORECASE)
+SOURCE_PATH_LINE_RE = re.compile(
+    r'([A-Za-z0-9_./\\-]+\.(?:tsx|ts|jsx|js|vue|svelte|html|component\.html)):(\d+)(?::(\d+))?'
+)
 
 
 # Rule → triage group mapping. For anything not in this map, we fall back to
@@ -718,6 +728,95 @@ def _blast_radius(issue: dict) -> Optional[dict]:
     return None
 
 
+def _mapping_from_source_loc(snippet: str) -> Optional[dict]:
+    match = SOURCE_LOC_ATTR_RE.search(snippet or "")
+    if not match:
+        return None
+    loc_match = SOURCE_PATH_LINE_RE.search(match.group(1))
+    if not loc_match:
+        return None
+    source_file = loc_match.group(1).replace("\\", "/")
+    source_line = int(loc_match.group(2))
+    explanation = "Mapped from debug DOM attribute data-source-loc."
+    return {
+        "source_file": source_file,
+        "source_line": source_line,
+        "confidence": "high",
+        "explanation": explanation,
+    }
+
+
+def _mapping_from_source_attrs(snippet: str) -> Optional[dict]:
+    source_file = _find_attr(snippet, SOURCE_FILE_ATTR_RE)
+    if not source_file:
+        return None
+    line_match = SOURCE_LINE_ATTR_RE.search(snippet or "")
+    source_line = int(line_match.group(1)) if line_match else 0
+    confidence = "high" if source_line else "medium"
+    explanation = "Mapped from debug DOM attributes data-source-file/data-source-line."
+    if not source_line:
+        explanation = "Mapped from debug DOM attribute data-source-file without a precise source line."
+    return {
+        "source_file": source_file.replace("\\", "/"),
+        "source_line": source_line,
+        "confidence": confidence,
+        "explanation": explanation,
+    }
+
+
+def _mapping_from_component_attrs(snippet: str) -> Optional[dict]:
+    source_file = _find_attr(snippet, COMPONENT_FILE_ATTR_RE)
+    if source_file:
+        line_match = COMPONENT_LINE_ATTR_RE.search(snippet or "")
+        source_line = int(line_match.group(1)) if line_match else 0
+        return {
+            "source_file": source_file.replace("\\", "/"),
+            "source_line": source_line,
+            "confidence": "medium",
+            "explanation": "Mapped from debug component-file attributes exposed in the rendered DOM.",
+        }
+
+    stack_match = COMPONENT_STACK_ATTR_RE.search(snippet or "")
+    if not stack_match:
+        return None
+    loc_match = SOURCE_PATH_LINE_RE.search(stack_match.group(1))
+    if not loc_match:
+        return None
+    return {
+        "source_file": loc_match.group(1).replace("\\", "/"),
+        "source_line": int(loc_match.group(2)),
+        "confidence": "medium",
+        "explanation": "Mapped from a debug component stack attribute exposed in the rendered DOM.",
+    }
+
+
+def _normalize_mapping(issue: dict, scanner: str) -> dict:
+    if scanner in {"static", "token"}:
+        location = _normalize_location(issue)
+        explanation = "Mapped directly from the source scanner location."
+        if scanner == "token":
+            explanation = "Mapped directly from the token source file."
+        return {
+            "source_file": location["file"],
+            "source_line": location["line"],
+            "confidence": "high",
+            "explanation": explanation,
+        }
+
+    snippet = issue.get("snippet", "")
+    for builder in (_mapping_from_source_loc, _mapping_from_source_attrs, _mapping_from_component_attrs):
+        mapping = builder(snippet)
+        if mapping:
+            return mapping
+
+    return {
+        "source_file": "",
+        "source_line": 0,
+        "confidence": "low",
+        "explanation": "No source mapping hints were available in the runtime DOM evidence.",
+    }
+
+
 def normalize_finding(issue: dict, detected_at: str, output_dir: Path) -> dict:
     scanner = _infer_scanner(issue)
     triage_group = {
@@ -726,6 +825,9 @@ def normalize_finding(issue: dict, detected_at: str, output_dir: Path) -> dict:
         "manual": "manual_review",
     }.get(classify(issue), "needs_input")
     fingerprint, fingerprint_data = _fingerprint(issue, scanner)
+    mapping = _normalize_mapping(issue, scanner)
+    if scanner in {"runtime", "stateful"} and triage_group == "autofix" and mapping["confidence"] == "low":
+        triage_group = "needs_input"
     normalized = {
         "id": _finding_id(fingerprint),
         "rule_id": issue["rule_id"],
@@ -742,12 +844,7 @@ def normalize_finding(issue: dict, detected_at: str, output_dir: Path) -> dict:
         "waiver": None,
         "group_reason": _group_reason(issue, triage_group),
         "location": _normalize_location(issue),
-        "mapping": {
-            "source_file": "",
-            "source_line": 0,
-            "confidence": "low",
-            "explanation": "",
-        },
+        "mapping": mapping,
         "evidence": _normalize_evidence(issue, output_dir),
         "decision_required": _decision_required(issue, triage_group),
         "proposed_fix": _proposed_fix(issue, triage_group),

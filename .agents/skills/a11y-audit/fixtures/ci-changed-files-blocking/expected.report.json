@@ -1,0 +1,113 @@
+{
+  "schema_version": "2.5.0",
+  "generated_at": "2026-01-02T03:04:05Z",
+  "target": "http://example.test/checkout",
+  "framework": "unknown",
+  "standard": "WCAG 2.2 Level AA",
+  "summary": {
+    "scanner_detected_issue_count": 1,
+    "auto_fixable_count": 1,
+    "needs_input_count": 0,
+    "manual_review_count": 0,
+    "waived_count": 0,
+    "not_checked_count": 0,
+    "by_scanner": {
+      "static": 0,
+      "runtime": 1,
+      "stateful": 0,
+      "manual-template": 0,
+      "token": 0
+    },
+    "by_confidence": {
+      "high": 1,
+      "medium": 0,
+      "low": 0
+    },
+    "status_counts": {
+      "open": 1,
+      "waived": 0,
+      "fixed": 0,
+      "resolved": 0,
+      "stale": 0
+    }
+  },
+  "coverage_metadata": {
+    "coverage_source": "references/wcag_coverage.md",
+    "manual_checklist_included": true,
+    "not_checked_criteria": []
+  },
+  "baseline_comparison": {
+    "baseline_present": false,
+    "baseline_generated_at": "",
+    "summary": {
+      "new": 0,
+      "unchanged": 0,
+      "fixed": 0,
+      "resolved": 0,
+      "stale": 0,
+      "waived": 0
+    }
+  },
+  "findings": [
+    {
+      "id": "7dc5dc6c5d44",
+      "rule_id": "aria-hidden-focusable",
+      "title": "aria-hidden on focusable element",
+      "wcag": [
+        "4.1.2"
+      ],
+      "severity": "serious",
+      "scanner": "runtime",
+      "scanner_version": "2.5.0",
+      "detected_at": "2026-01-02T03:04:05Z",
+      "triage_group": "autofix",
+      "fix_safety": "safe",
+      "confidence": "high",
+      "status": "open",
+      "group_reason": "Rule is classified as safe to patch automatically for this evidence source.",
+      "location": {
+        "file": "",
+        "line": 0,
+        "column": 0,
+        "url": "http://example.test/checkout",
+        "selector": "#pay-button",
+        "journey_step_id": ""
+      },
+      "mapping": {
+        "source_file": "src/components/CheckoutButton.tsx",
+        "source_line": 42,
+        "confidence": "high",
+        "explanation": "Mapped from debug DOM attributes data-source-file/data-source-line."
+      },
+      "evidence": {
+        "snippet": "",
+        "dom_snippet": "<button data-source-file=\"src/components/CheckoutButton.tsx\" data-source-line=\"42\" aria-hidden=\"true\">Pay</button>",
+        "screenshot": "",
+        "axe_help_url": "https://dequeuniversity.com/rules/axe/4.8/aria-hidden-focus"
+      },
+      "decision_required": {
+        "question": "",
+        "options": []
+      },
+      "proposed_fix": {
+        "kind": "diff",
+        "diff": "```diff\n- <button data-source-file=\"src/components/CheckoutButton.tsx\" data-source-line=\"42\" aria-hidden=\"true\">Pay</button>\n+ <button data-source-file=\"src/components/CheckoutButton.tsx\" data-source-line=\"42\" >Pay</button>\n```",
+        "notes": ""
+      },
+      "fingerprint": "aria-hidden-focusable|#pay-button|http://example.test/checkout",
+      "confirmed_by": [
+        "runtime"
+      ],
+      "waiver": null,
+      "fingerprint_data": {
+        "fingerprint_version": "1.0",
+        "normalized_selector": "#pay-button",
+        "page_context": "http://example.test/checkout",
+        "page_or_step_context": "http://example.test/checkout",
+        "unstable": false
+      },
+      "origin_rule_id": "aria-hidden-focus"
+    }
+  ],
+  "not_checked": []
+}

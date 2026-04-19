@@ -1,5 +1,5 @@
 {
-  "schema_version": "2.4.0",
+  "schema_version": "2.5.0",
   "generated_at": "2026-01-02T03:04:05Z",
   "target": "fixtures/baseline-unstable-fallback",
   "framework": "html",
@@ -82,6 +82,12 @@
         "url": "",
         "selector": "",
         "journey_step_id": ""
+      },
+      "mapping": {
+        "source_file": "",
+        "source_line": 0,
+        "confidence": "low",
+        "explanation": ""
       },
       "evidence": {
         "snippet": "<div onClick=\"save()\">Action</div>",

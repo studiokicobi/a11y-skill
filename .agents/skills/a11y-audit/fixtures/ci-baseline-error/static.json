@@ -1,0 +1,22 @@
+{
+  "framework": "html",
+  "target": "fixtures/ci-baseline-error",
+  "files_scanned": 1,
+  "issue_count": 1,
+  "issues": [
+    {
+      "rule_id": "img-missing-alt",
+      "wcag": "1.1.1",
+      "file": "fixtures/ci-baseline-error/index.html",
+      "line": 3,
+      "col": 1,
+      "snippet": "<img src=\"hero.png\">",
+      "message": "<img> is missing an alt attribute.",
+      "framework": "html",
+      "triage_hint": "input",
+      "fix_data": {
+        "pattern": "add_alt"
+      }
+    }
+  ]
+}

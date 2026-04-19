@@ -1,30 +1,30 @@
 {
   "schema_version": "2.5.0",
   "generated_at": "2026-01-02T03:04:05Z",
-  "target": "http://localhost:3000",
+  "target": "http://example.test/checkout",
   "framework": "unknown",
   "standard": "WCAG 2.2 Level AA",
   "summary": {
-    "scanner_detected_issue_count": 1,
-    "auto_fixable_count": 0,
+    "scanner_detected_issue_count": 2,
+    "auto_fixable_count": 1,
     "needs_input_count": 1,
     "manual_review_count": 0,
     "waived_count": 0,
     "not_checked_count": 9,
     "by_scanner": {
       "static": 0,
-      "runtime": 1,
+      "runtime": 2,
       "stateful": 0,
       "manual-template": 0,
       "token": 0
     },
     "by_confidence": {
-      "high": 1,
+      "high": 2,
       "medium": 0,
       "low": 0
     },
     "status_counts": {
-      "open": 1,
+      "open": 2,
       "waived": 0,
       "fixed": 0,
       "resolved": 0,
@@ -60,7 +60,66 @@
   },
   "findings": [
     {
-      "id": "777e1d12e6bc",
+      "id": "7dc5dc6c5d44",
+      "rule_id": "aria-hidden-focusable",
+      "title": "aria-hidden on focusable element",
+      "wcag": [
+        "4.1.2"
+      ],
+      "severity": "serious",
+      "scanner": "runtime",
+      "scanner_version": "2.5.0",
+      "detected_at": "2026-01-02T03:04:05Z",
+      "triage_group": "autofix",
+      "fix_safety": "safe",
+      "confidence": "high",
+      "status": "open",
+      "group_reason": "Rule is classified as safe to patch automatically for this evidence source.",
+      "location": {
+        "file": "",
+        "line": 0,
+        "column": 0,
+        "url": "http://example.test/checkout",
+        "selector": "#pay-button",
+        "journey_step_id": ""
+      },
+      "mapping": {
+        "source_file": "src/components/CheckoutButton.tsx",
+        "source_line": 42,
+        "confidence": "high",
+        "explanation": "Mapped from debug DOM attributes data-source-file/data-source-line."
+      },
+      "evidence": {
+        "snippet": "",
+        "dom_snippet": "<button data-source-file=\"src/components/CheckoutButton.tsx\" data-source-line=\"42\" data-source-column=\"7\" aria-hidden=\"true\">Pay</button>",
+        "screenshot": "",
+        "axe_help_url": "https://dequeuniversity.com/rules/axe/4.8/aria-hidden-focus"
+      },
+      "decision_required": {
+        "question": "",
+        "options": []
+      },
+      "proposed_fix": {
+        "kind": "diff",
+        "diff": "```diff\n- <button data-source-file=\"src/components/CheckoutButton.tsx\" data-source-line=\"42\" data-source-column=\"7\" aria-hidden=\"true\">Pay</button>\n+ <button data-source-file=\"src/components/CheckoutButton.tsx\" data-source-line=\"42\" data-source-column=\"7\" >Pay</button>\n```",
+        "notes": ""
+      },
+      "fingerprint": "aria-hidden-focusable|#pay-button|http://example.test/checkout",
+      "confirmed_by": [
+        "runtime"
+      ],
+      "waiver": null,
+      "fingerprint_data": {
+        "fingerprint_version": "1.0",
+        "normalized_selector": "#pay-button",
+        "page_context": "http://example.test/checkout",
+        "page_or_step_context": "http://example.test/checkout",
+        "unstable": false
+      },
+      "origin_rule_id": "aria-hidden-focus"
+    },
+    {
+      "id": "aacddc8dbf3d",
       "rule_id": "color-contrast",
       "title": "Color contrast failure (runtime)",
       "wcag": [
@@ -79,21 +138,21 @@
         "file": "",
         "line": 0,
         "column": 0,
-        "url": "http://localhost:3000",
-        "selector": "main > p.muted-copy",
+        "url": "http://example.test/checkout",
+        "selector": ".price-badge",
         "journey_step_id": ""
       },
       "mapping": {
-        "source_file": "",
-        "source_line": 0,
-        "confidence": "low",
-        "explanation": "No source mapping hints were available in the runtime DOM evidence."
+        "source_file": "src/components/PriceBadge.tsx",
+        "source_line": 18,
+        "confidence": "medium",
+        "explanation": "Mapped from a debug component stack attribute exposed in the rendered DOM."
       },
       "evidence": {
         "snippet": "",
-        "dom_snippet": "<p class=\"muted-copy\">Low contrast helper text</p>",
+        "dom_snippet": "<span data-component-stack=\"Checkout > PriceBadge@src/components/PriceBadge.tsx:18\">$9</span>",
         "screenshot": "",
-        "axe_help_url": "https://dequeuniversity.com/rules/axe/4.10/color-contrast"
+        "axe_help_url": "https://dequeuniversity.com/rules/axe/4.8/color-contrast"
       },
       "decision_required": {
         "question": "Pick an accessible color that aligns with your brand \u2014 we'll suggest 2\u20133 options if you want.",
@@ -104,16 +163,16 @@
         "diff": "",
         "notes": ""
       },
-      "fingerprint": "color-contrast|main > p.muted-copy|http://localhost:3000",
+      "fingerprint": "color-contrast|.price-badge|http://example.test/checkout",
       "confirmed_by": [
         "runtime"
       ],
       "waiver": null,
       "fingerprint_data": {
         "fingerprint_version": "1.0",
-        "normalized_selector": "main > p.muted-copy",
-        "page_context": "http://localhost:3000",
-        "page_or_step_context": "http://localhost:3000",
+        "normalized_selector": ".price-badge",
+        "page_context": "http://example.test/checkout",
+        "page_or_step_context": "http://example.test/checkout",
         "unstable": false
       },
       "origin_rule_id": "color-contrast"

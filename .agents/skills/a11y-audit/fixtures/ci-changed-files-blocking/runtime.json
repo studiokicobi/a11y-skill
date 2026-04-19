@@ -1,0 +1,45 @@
+{
+  "scanner": "runtime",
+  "engine": "axe-core",
+  "browser": "chromium",
+  "urls": ["http://example.test/checkout"],
+  "issue_count": 2,
+  "issues": [
+    {
+      "rule_id": "aria-hidden-focusable",
+      "origin_rule_id": "aria-hidden-focus",
+      "wcag": "4.1.2",
+      "file": "http://example.test/checkout",
+      "line": 0,
+      "col": 0,
+      "snippet": "<button data-source-file=\"src/components/CheckoutButton.tsx\" data-source-line=\"42\" aria-hidden=\"true\">Pay</button>",
+      "message": "Focusable control is hidden from assistive technology.",
+      "framework": "runtime",
+      "triage_hint": "auto",
+      "fix_data": {
+        "target": "#pay-button",
+        "help_url": "https://dequeuniversity.com/rules/axe/4.8/aria-hidden-focus",
+        "impact": "serious",
+        "result_type": "violation"
+      }
+    },
+    {
+      "rule_id": "color-contrast",
+      "origin_rule_id": "color-contrast",
+      "wcag": "1.4.3",
+      "file": "http://example.test/checkout",
+      "line": 0,
+      "col": 0,
+      "snippet": "<span data-component-stack=\"Checkout > PriceBadge@src/components/PriceBadge.tsx:18\">$9</span>",
+      "message": "Elements must meet minimum color contrast ratio thresholds.",
+      "framework": "runtime",
+      "triage_hint": "input",
+      "fix_data": {
+        "target": ".price-badge",
+        "help_url": "https://dequeuniversity.com/rules/axe/4.8/color-contrast",
+        "impact": "serious",
+        "result_type": "violation"
+      }
+    }
+  ]
+}

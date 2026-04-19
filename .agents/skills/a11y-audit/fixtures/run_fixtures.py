@@ -25,6 +25,7 @@ SKILL_ROOT = Path(__file__).parent.parent
 FIXTURES_ROOT = Path(__file__).parent
 SCANNER = SKILL_ROOT / "scripts" / "a11y_scan.py"
 TRIAGE = SKILL_ROOT / "scripts" / "triage.py"
+CLI = SKILL_ROOT / "scripts" / "cli.py"
 RUNTIME = SKILL_ROOT / "scripts" / "a11y_runtime.js"
 STATEFUL = SKILL_ROOT / "scripts" / "a11y_stateful.js"
 TOKENS = SKILL_ROOT / "scripts" / "tokens.py"
@@ -101,6 +102,7 @@ def normalize_report_json(report: dict) -> dict:
             "status": finding["status"],
             "group_reason": finding["group_reason"],
             "location": finding["location"],
+            "mapping": finding["mapping"],
             "evidence": finding["evidence"],
             "decision_required": finding["decision_required"],
             "proposed_fix": finding["proposed_fix"],
@@ -421,6 +423,11 @@ def run_triage_fixture(fixture_dir: Path, update: bool = False) -> bool:
     tokens_output_path = Path("/tmp/tokens-report.json")
     output_markdown_path = Path("/tmp/triage-report.md")
     output_json_path = Path("/tmp/triage-report.json")
+    for path in (tokens_output_path, output_markdown_path, output_json_path):
+        try:
+            path.unlink()
+        except FileNotFoundError:
+            pass
 
     cmd = [
         sys.executable,
@@ -492,8 +499,112 @@ def run_triage_fixture(fixture_dir: Path, update: bool = False) -> bool:
     return ok
 
 
+def run_cli_fixture(fixture_dir: Path, update: bool = False) -> bool:
+    name = fixture_dir.name
+    expected_summary_path = fixture_dir / "expected.summary.md"
+    expected_exit_path = fixture_dir / "expected.exit.txt"
+    expected_json_path = fixture_dir / "expected.report.json"
+    runtime_path = fixture_dir / "runtime.json"
+    stateful_path = fixture_dir / "stateful.json"
+    static_path = fixture_dir / "static.json"
+    tokens_path = fixture_dir / "tokens.json"
+    baseline_path = fixture_dir / "baseline.json"
+    status_path = fixture_dir / "status.json"
+    changed_files_path = fixture_dir / "changed-files.txt"
+    token_output_path = Path("/tmp/cli-tokens.json")
+    summary_output_path = Path("/tmp/pr-summary.md")
+    output_json_path = Path("/tmp/cli-report.json")
+    for path in (token_output_path, summary_output_path, output_json_path):
+        try:
+            path.unlink()
+        except FileNotFoundError:
+            pass
+
+    cmd = [
+        sys.executable,
+        str(CLI),
+        "--json-output",
+        str(output_json_path),
+        "--pr-summary-output",
+        str(summary_output_path),
+        "--detected-at",
+        FIXED_DETECTED_AT,
+        "--ci",
+    ]
+    if static_path.exists():
+        cmd.extend(["--static", str(static_path)])
+    if runtime_path.exists():
+        cmd.extend(["--runtime", str(runtime_path)])
+    if stateful_path.exists():
+        cmd.extend(["--stateful", str(stateful_path)])
+    if tokens_path.exists():
+        token_result = subprocess.run(
+            [sys.executable, str(TOKENS), str(tokens_path), "--output", str(token_output_path)],
+            capture_output=True, text=True,
+        )
+        if token_result.returncode != 0:
+            print(f"  FAIL {name}: token scan exited {token_result.returncode}")
+            print(f"        stderr: {token_result.stderr.strip()}")
+            return False
+        cmd.extend(["--tokens", str(token_output_path)])
+    if baseline_path.exists():
+        cmd.extend(["--baseline-file", str(baseline_path)])
+    if status_path.exists():
+        cmd.extend(["--status-file", str(status_path)])
+    if changed_files_path.exists():
+        cmd.extend(["--changed-files", str(changed_files_path)])
+
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    actual_exit = result.returncode
+    actual_summary = normalize_report(summary_output_path.read_text()) if summary_output_path.exists() else ""
+    actual_json = json.loads(output_json_path.read_text()) if output_json_path.exists() else None
+
+    if update:
+        if expected_summary_path or actual_summary:
+            expected_summary_path.write_text(actual_summary)
+        if actual_json is not None:
+            expected_json_path.write_text(json.dumps(normalize_report_json(actual_json), indent=2) + "\n")
+        expected_exit_path.write_text(str(actual_exit) + "\n")
+        print(f"  UPDATED {name}: CLI snapshots refreshed")
+        return True
+
+    ok = True
+    if expected_exit_path.exists():
+        expected_exit = int(expected_exit_path.read_text().strip())
+        if actual_exit == expected_exit:
+            print(f"  PASS {name}: CLI exit code matched snapshot")
+        else:
+            print(f"  FAIL {name}: CLI exit code expected {expected_exit}, got {actual_exit}")
+            ok = False
+
+    if expected_summary_path.exists():
+        expected_summary = normalize_report(expected_summary_path.read_text())
+        if actual_summary == expected_summary:
+            print(f"  PASS {name}: PR summary matched snapshot")
+        else:
+            print(f"  FAIL {name}: PR summary differed from expected.summary.md")
+            ok = False
+
+    if expected_json_path.exists():
+        if actual_json is None:
+            print(f"  FAIL {name}: CLI did not write expected.report.json output")
+            ok = False
+        else:
+            expected_json = json.loads(expected_json_path.read_text())
+            normalized_actual_json = normalize_report_json(actual_json)
+            if normalized_actual_json == expected_json:
+                print(f"  PASS {name}: CLI JSON matched snapshot")
+            else:
+                print(f"  FAIL {name}: CLI JSON differed from expected.report.json")
+                ok = False
+
+    return ok
+
+
 def run_fixture(fixture_dir: Path, update: bool = False) -> bool:
     """Returns True if the fixture passes (or was updated), False on failure."""
+    if (fixture_dir / "cli.fixture").exists() or (fixture_dir / "expected.summary.md").exists() or (fixture_dir / "expected.exit.txt").exists():
+        return run_cli_fixture(fixture_dir, update=update)
     if (fixture_dir / "expected.stateful.json").exists():
         return run_stateful_smoke_fixture(fixture_dir, update=update)
     if (fixture_dir / "expected.runtime.json").exists():
@@ -527,6 +638,8 @@ def main():
             or (d / "expected.json").exists()
             or (d / "expected.md").exists()
             or (d / "expected.report.json").exists()
+            or (d / "expected.summary.md").exists()
+            or (d / "expected.exit.txt").exists()
             or (d / "expected.error.txt").exists()
             or (args.live_runtime and ((d / "expected.runtime.json").exists() or (d / "expected.stateful.json").exists()))
         )
