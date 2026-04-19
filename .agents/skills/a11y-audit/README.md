@@ -72,14 +72,17 @@ node scripts/a11y_runtime.js --config runtime.config.json --output /tmp/runtime.
 # Stateful journey scan with checkpoint screenshots
 node scripts/a11y_stateful.js --config journey.config.json --output /tmp/stateful.json
 
+# Token scan for supported JSON token files
+python3 scripts/tokens.py design-tokens.json --output /tmp/tokens.json
+
 # Triage into markdown plus normalized JSON
-python3 scripts/triage.py --static /tmp/static.json --runtime /tmp/runtime.json --stateful /tmp/stateful.json --output report.md --json-output report.json
+python3 scripts/triage.py --static /tmp/static.json --runtime /tmp/runtime.json --stateful /tmp/stateful.json --tokens /tmp/tokens.json --output report.md --json-output report.json
 
 # Compare a run to an existing baseline
-python3 scripts/triage.py --static /tmp/static.json --json-output report.json --baseline-file baseline.json
+python3 scripts/triage.py --static /tmp/static.json --tokens /tmp/tokens.json --json-output report.json --baseline-file baseline.json
 
 # Write a new baseline directly from triage output
-python3 scripts/triage.py --static /tmp/static.json --json-output report.json --write-baseline baseline.json
+python3 scripts/triage.py --static /tmp/static.json --tokens /tmp/tokens.json --json-output report.json --write-baseline baseline.json
 
 # Or build a baseline from an existing normalized report
 python3 scripts/baseline.py --report report.json --output baseline.json
@@ -98,7 +101,7 @@ The output is markdown with three sections in this order:
 
 Plus a "Not checked" section listing WCAG criteria that no automated tool can evaluate, so you know the gaps.
 
-When `--json-output` is used, the normalized report includes deterministic `not_checked` findings, status and waiver metadata, `group_reason`, `fingerprint`, `fingerprint_data`, `baseline_comparison`, and `confirmed_by`.
+When `--json-output` is used, the normalized report includes deterministic `not_checked` findings, status and waiver metadata, `group_reason`, `fingerprint`, `fingerprint_data`, optional `blast_radius`, `baseline_comparison`, and `confirmed_by`.
 
 ## Baselines and waivers
 
@@ -107,6 +110,7 @@ The normalized JSON report is the source for repeatable regression tracking.
 - Use `--write-baseline` on `triage.py`, or `scripts/baseline.py`, to save a stable JSON baseline.
 - Use `--baseline-file` on later runs to classify findings as `new`, `unchanged`, `fixed`, `resolved`, `stale`, or `waived`.
 - Static findings use stable-anchor precedence for fingerprints: `id`, `data-testid`, associated label, `name`, nearest heading, then line fallback.
+- Token findings use `rule_id + file + token anchor` fingerprints so design-system issues survive line movement in the token file.
 - Line-fallback fingerprints are marked `unstable: true` so a disappeared match becomes `stale` rather than being overclaimed as `fixed`.
 - Use `--status-file` on `triage.py` to carry waiver and administrative status records across runs.
 
@@ -170,6 +174,37 @@ journeys:
         wait_for:
           hidden_selector: '[role="dialog"]'
         scan: true
+```
+
+## Token config
+
+`tokens.py` currently supports one explicit JSON token format intended to stay narrow and reliable:
+
+- `tokens`: nested token values, where leaf objects can use `{ "value": "#rrggbb" }`
+- `pairs[]`: contrast pairs with `foreground`, `background`, `kind`, and optional `scope`
+- `focus_indicators[]`: focus ring definitions with `token`, `background`, and optional `width_px`
+- `semantic_states[]`: semantic color tokens with `token`, `meaning`, and `non_color_cue`
+
+Minimal example:
+
+```json
+{
+  "tokens": {
+    "color": {
+      "text": { "muted": { "value": "#9aa0aa" } },
+      "surface": { "default": { "value": "#ffffff" } }
+    }
+  },
+  "pairs": [
+    {
+      "id": "body-muted",
+      "foreground": "color.text.muted",
+      "background": "color.surface.default",
+      "kind": "text",
+      "scope": "design-system"
+    }
+  ]
+}
 ```
 
 ## What this skill does NOT do

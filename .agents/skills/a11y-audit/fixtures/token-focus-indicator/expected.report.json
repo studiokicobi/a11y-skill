@@ -1,13 +1,13 @@
 {
   "schema_version": "2.4.0",
   "generated_at": "2026-01-02T03:04:05Z",
-  "target": "https://example.test/settings",
-  "framework": "stateful",
+  "target": "/Users/colin/Sites/a11y-skill/.agents/skills/a11y-audit/fixtures/token-focus-indicator/tokens.json",
+  "framework": "token",
   "standard": "WCAG 2.2 Level AA",
   "summary": {
-    "scanner_detected_issue_count": 0,
+    "scanner_detected_issue_count": 1,
     "auto_fixable_count": 0,
-    "needs_input_count": 0,
+    "needs_input_count": 1,
     "manual_review_count": 0,
     "waived_count": 0,
     "not_checked_count": 9,
@@ -16,15 +16,15 @@
       "runtime": 0,
       "stateful": 0,
       "manual-template": 0,
-      "token": 0
+      "token": 1
     },
     "by_confidence": {
-      "high": 0,
+      "high": 1,
       "medium": 0,
       "low": 0
     },
     "status_counts": {
-      "open": 0,
+      "open": 1,
       "waived": 0,
       "fixed": 0,
       "resolved": 0,
@@ -58,7 +58,63 @@
       "waived": 0
     }
   },
-  "findings": [],
+  "findings": [
+    {
+      "id": "3fc614f5335e",
+      "rule_id": "token-focus-indicator",
+      "title": "Focus indicator token is missing or too weak",
+      "wcag": [
+        "1.4.11"
+      ],
+      "severity": "serious",
+      "scanner": "token",
+      "scanner_version": "2.4.0",
+      "detected_at": "2026-01-02T03:04:05Z",
+      "triage_group": "needs_input",
+      "fix_safety": "input-required",
+      "confidence": "high",
+      "status": "open",
+      "group_reason": "Finding requires human input, content intent, or scanner uncertainty before remediation.",
+      "location": {
+        "file": "/Users/colin/Sites/a11y-skill/.agents/skills/a11y-audit/fixtures/token-focus-indicator/tokens.json",
+        "line": 18,
+        "column": 14,
+        "url": "",
+        "selector": "",
+        "journey_step_id": ""
+      },
+      "evidence": {
+        "snippet": "{\"background\": \"color.surface.default\", \"component\": \"Button\", \"id\": \"button-ring\", \"scope\": \"component\", \"token\": \"color.focus.ring\", \"width_px\": 1}",
+        "dom_snippet": "",
+        "screenshot": "",
+        "axe_help_url": ""
+      },
+      "decision_required": {
+        "question": "Should we strengthen the focus ring color, width, or both for this token set?",
+        "options": []
+      },
+      "proposed_fix": {
+        "kind": "none",
+        "diff": "",
+        "notes": ""
+      },
+      "fingerprint": "token-focus-indicator|/Users/colin/Sites/a11y-skill/.agents/skills/a11y-audit/fixtures/token-focus-indicator/tokens.json|token|button-ring",
+      "confirmed_by": [
+        "token"
+      ],
+      "waiver": null,
+      "fingerprint_data": {
+        "fingerprint_version": "1.0",
+        "anchor_source": "token",
+        "anchor_value": "button-ring",
+        "unstable": false
+      },
+      "blast_radius": {
+        "scope": "component",
+        "summary": "one component (Button)"
+      }
+    }
+  ],
   "not_checked": [
     {
       "rule_id": "not-checked-1-2-1",

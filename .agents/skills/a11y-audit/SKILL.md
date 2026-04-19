@@ -64,7 +64,15 @@ node scripts/a11y_stateful.js --config journey.config.json --output /tmp/a11y-st
 ```
 Uses Playwright + axe-core checkpoint scans after scripted actions. Emits stateful findings with `journey_step_id`, plus focus transitions, step failures, and checkpoint screenshots. The supported config shape lives in `references/journey_schema.md`.
 
+**Token scan** (when a repo has explicit design-token JSON):
+```bash
+python3 scripts/tokens.py design-tokens.json --output /tmp/a11y-tokens.json
+```
+This is intentionally narrow. It currently supports one explicit JSON token schema for contrast pairs, focus indicator tokens, and color-only semantic tokens. Use it when the repo has a maintained token file and you want design-system-level findings with blast-radius reporting.
+
 **If the user gives a URL, run static plus runtime.** Add the stateful runner when the page depends on modals, route transitions, validation states, or other interaction-driven UI. Static tells you where to fix in the source; runtime confirms what the real DOM produces on page load; stateful confirms what appears after the user actually interacts. If the user only gives a directory, run static only and note in the report that runtime/stateful checks weren't performed.
+
+**If the repo also includes a supported token file, run the token scanner too.** Token findings are design-system issues, not page-local DOM issues, and should be reported alongside the other findings rather than merged into static source rules.
 
 **If the user gives a production URL but no source**, runtime only. Fixes will be framework-agnostic HTML/CSS suggestions.
 
@@ -83,6 +91,7 @@ python3 scripts/triage.py \
   --static /tmp/a11y-static.json \
   --runtime /tmp/a11y-runtime.json \
   --stateful /tmp/a11y-stateful.json \
+  --tokens /tmp/a11y-tokens.json \
   --status-file status.json \
   --baseline-file baseline.json \
   --output /tmp/a11y-report.md \

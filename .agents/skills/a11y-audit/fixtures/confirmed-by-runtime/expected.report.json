@@ -1,5 +1,5 @@
 {
-  "schema_version": "2.3.0",
+  "schema_version": "2.4.0",
   "generated_at": "2026-01-02T03:04:05Z",
   "target": "fixtures/confirmed-by-runtime",
   "framework": "html",
@@ -68,7 +68,7 @@
       ],
       "severity": "serious",
       "scanner": "static",
-      "scanner_version": "2.3.0",
+      "scanner_version": "2.4.0",
       "detected_at": "2026-01-02T03:04:05Z",
       "triage_group": "needs_input",
       "fix_safety": "input-required",

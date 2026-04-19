@@ -27,6 +27,7 @@ SCANNER = SKILL_ROOT / "scripts" / "a11y_scan.py"
 TRIAGE = SKILL_ROOT / "scripts" / "triage.py"
 RUNTIME = SKILL_ROOT / "scripts" / "a11y_runtime.js"
 STATEFUL = SKILL_ROOT / "scripts" / "a11y_stateful.js"
+TOKENS = SKILL_ROOT / "scripts" / "tokens.py"
 FIXED_DETECTED_AT = "2026-01-02T03:04:05Z"
 
 
@@ -111,6 +112,8 @@ def normalize_report_json(report: dict) -> dict:
             compact["comparison"] = finding["comparison"]
         if "fingerprint_data" in finding:
             compact["fingerprint_data"] = finding["fingerprint_data"]
+        if "blast_radius" in finding:
+            compact["blast_radius"] = finding["blast_radius"]
         if "origin_rule_id" in finding:
             compact["origin_rule_id"] = finding["origin_rule_id"]
         normalized["findings"].append(compact)
@@ -412,8 +415,10 @@ def run_triage_fixture(fixture_dir: Path, update: bool = False) -> bool:
     runtime_path = fixture_dir / "runtime.json"
     stateful_path = fixture_dir / "stateful.json"
     static_path = fixture_dir / "static.json"
+    tokens_path = fixture_dir / "tokens.json"
     baseline_path = fixture_dir / "baseline.json"
     status_path = fixture_dir / "status.json"
+    tokens_output_path = Path("/tmp/tokens-report.json")
     output_markdown_path = Path("/tmp/triage-report.md")
     output_json_path = Path("/tmp/triage-report.json")
 
@@ -433,6 +438,16 @@ def run_triage_fixture(fixture_dir: Path, update: bool = False) -> bool:
         cmd.extend(["--runtime", str(runtime_path)])
     if stateful_path.exists():
         cmd.extend(["--stateful", str(stateful_path)])
+    if tokens_path.exists():
+        token_result = subprocess.run(
+            [sys.executable, str(TOKENS), str(tokens_path), "--output", str(tokens_output_path)],
+            capture_output=True, text=True,
+        )
+        if token_result.returncode != 0:
+            print(f"  FAIL {name}: token scan exited {token_result.returncode}")
+            print(f"        stderr: {token_result.stderr.strip()}")
+            return False
+        cmd.extend(["--tokens", str(tokens_output_path)])
     if baseline_path.exists():
         cmd.extend(["--baseline-file", str(baseline_path)])
     if status_path.exists():
@@ -485,7 +500,12 @@ def run_fixture(fixture_dir: Path, update: bool = False) -> bool:
         return run_runtime_smoke_fixture(fixture_dir, update=update)
     if (fixture_dir / "expected.error.txt").exists():
         return run_runtime_error_fixture(fixture_dir)
-    if (fixture_dir / "runtime.json").exists() or (fixture_dir / "static.json").exists() or (fixture_dir / "stateful.json").exists():
+    if (
+        (fixture_dir / "runtime.json").exists()
+        or (fixture_dir / "static.json").exists()
+        or (fixture_dir / "stateful.json").exists()
+        or (fixture_dir / "tokens.json").exists()
+    ):
         return run_triage_fixture(fixture_dir, update=update)
     return run_static_fixture(fixture_dir, update=update)
 

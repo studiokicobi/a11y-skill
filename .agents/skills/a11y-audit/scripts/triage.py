@@ -26,7 +26,7 @@ from typing import Dict, Iterable, List, Optional, Tuple
 from baseline import FINGERPRINT_VERSION, build_baseline, compare_findings, load_baseline
 
 
-SCANNER_VERSION = "2.3.0"
+SCANNER_VERSION = "2.4.0"
 STANDARD = "WCAG 2.2 Level AA"
 DEFAULT_CONFIDENCE = "medium"
 REPORT_GROUPS = ("autofix", "needs_input", "manual_review", "not_checked")
@@ -64,6 +64,9 @@ RULE_TO_GROUP = {
     "positive-tabindex": "input",
     "media-autoplay": "input",
     "heading-order": "input",
+    "token-low-contrast": "input",
+    "token-focus-indicator": "input",
+    "token-color-only-semantic": "input",
 }
 
 
@@ -84,6 +87,9 @@ RULE_TO_SEVERITY = {
     "duplicate-id": "moderate",
     "color-contrast": "serious",
     "heading-order": "moderate",
+    "token-low-contrast": "serious",
+    "token-focus-indicator": "serious",
+    "token-color-only-semantic": "moderate",
 }
 
 
@@ -104,6 +110,9 @@ RULE_TO_CONFIDENCE = {
     "duplicate-id": "medium",
     "color-contrast": "high",
     "heading-order": "medium",
+    "token-low-contrast": "high",
+    "token-focus-indicator": "high",
+    "token-color-only-semantic": "high",
 }
 
 
@@ -269,9 +278,28 @@ def _runtime_fingerprint_data(issue: dict, scanner: str) -> dict:
     }
 
 
+def _token_fingerprint_data(issue: dict) -> dict:
+    token_name = (
+        issue.get("fix_data", {}).get("token_name")
+        or issue.get("fix_data", {}).get("pair_id")
+        or issue.get("fix_data", {}).get("semantic_token")
+        or issue.get("fix_data", {}).get("focus_token")
+        or f"line-{issue.get('line', 0)}"
+    )
+    unstable = token_name.startswith("line-")
+    return {
+        "fingerprint_version": FINGERPRINT_VERSION,
+        "anchor_source": "token",
+        "anchor_value": str(token_name),
+        "unstable": unstable,
+    }
+
+
 def _fingerprint_data(issue: dict, scanner: str) -> dict:
     if scanner == "static":
         return _static_fingerprint_data(issue)
+    if scanner == "token":
+        return _token_fingerprint_data(issue)
     return _runtime_fingerprint_data(issue, scanner)
 
 
@@ -407,6 +435,9 @@ def humanize_rule(rule_id: str) -> str:
         "duplicate-id": "Duplicate id attribute",
         "color-contrast": "Color contrast failure (runtime)",
         "heading-order": "Heading order skip",
+        "token-low-contrast": "Token contrast pair fails WCAG",
+        "token-focus-indicator": "Focus indicator token is missing or too weak",
+        "token-color-only-semantic": "Semantic token relies on color alone",
     }
     return titles.get(rule_id, rule_id.replace("-", " ").capitalize())
 
@@ -419,6 +450,9 @@ def decision_prompt(issue: dict) -> str:
         "media-autoplay": "Keep autoplay with pause controls, or remove autoplay entirely?",
         "color-contrast": "Pick an accessible color that aligns with your brand — we'll suggest 2–3 options if you want.",
         "heading-order": "Should the out-of-order heading be downgraded/upgraded to match the sequence, or should we restructure the page hierarchy?",
+        "token-low-contrast": "Which nearby compliant token value should replace this failing pair?",
+        "token-focus-indicator": "Should we strengthen the focus ring color, width, or both for this token set?",
+        "token-color-only-semantic": "What non-color cue should accompany this semantic token across the design system?",
     }
     return prompts.get(issue["rule_id"], "Review and confirm the proposed fix below.")
 
@@ -617,7 +651,7 @@ def _confirmed_by(issue: dict, scanner: str) -> List[str]:
 
 def _fingerprint(issue: dict, scanner: str) -> Tuple[str, dict]:
     data = _fingerprint_data(issue, scanner)
-    if scanner == "static":
+    if scanner in {"static", "token"}:
         fingerprint = "|".join([
             issue["rule_id"],
             str(issue.get("file", "")),
@@ -677,6 +711,13 @@ def _normalize_evidence(issue: dict, output_dir: Path) -> dict:
     }
 
 
+def _blast_radius(issue: dict) -> Optional[dict]:
+    value = issue.get("fix_data", {}).get("blast_radius")
+    if isinstance(value, dict):
+        return copy.deepcopy(value)
+    return None
+
+
 def normalize_finding(issue: dict, detected_at: str, output_dir: Path) -> dict:
     scanner = _infer_scanner(issue)
     triage_group = {
@@ -717,6 +758,9 @@ def normalize_finding(issue: dict, detected_at: str, output_dir: Path) -> dict:
     origin_rule_id = _origin_rule_id(issue)
     if origin_rule_id:
         normalized["origin_rule_id"] = origin_rule_id
+    blast_radius = _blast_radius(issue)
+    if blast_radius:
+        normalized["blast_radius"] = blast_radius
     return normalized
 
 
@@ -1020,6 +1064,7 @@ def build_report_data(
     static_data: Optional[dict],
     runtime_data: Optional[dict],
     stateful_data: Optional[dict],
+    token_data: Optional[dict],
     baseline_data: Optional[dict],
     output_dir: Path,
     detected_at: str,
@@ -1032,6 +1077,8 @@ def build_report_data(
         issues.extend(runtime_data.get("issues", []))
     if stateful_data:
         issues.extend(stateful_data.get("issues", []))
+    if token_data:
+        issues.extend(token_data.get("issues", []))
 
     current_findings = [
         normalize_finding(issue, detected_at, output_dir)
@@ -1083,11 +1130,15 @@ def build_report_data(
     }
 
     target = (
-        (static_data or runtime_data or {}).get("target")
+        (static_data or runtime_data or token_data or {}).get("target")
         or ", ".join((runtime_data or {}).get("urls", []))
         or ", ".join(journey.get("start_url", "") for journey in (stateful_data or {}).get("journeys", []))
     )
-    framework = (static_data or {}).get("framework") or ("stateful" if stateful_data else "unknown")
+    framework = (
+        (static_data or {}).get("framework")
+        or (token_data or {}).get("scanner")
+        or ("stateful" if stateful_data else "unknown")
+    )
 
     report = {
         "schema_version": SCANNER_VERSION,
@@ -1412,6 +1463,13 @@ def _comparison_value(finding: dict) -> str:
     return str(finding.get("comparison", "") or "")
 
 
+def _blast_radius_value(finding: dict) -> str:
+    blast_radius = finding.get("blast_radius")
+    if isinstance(blast_radius, dict):
+        return str(blast_radius.get("summary", "") or "")
+    return ""
+
+
 def build_markdown_report(report: dict, message_lookup: Dict[str, str], manual_items: List[dict], step_failures: List[dict]) -> str:
     findings = report["findings"]
     active_findings = [f for f in findings if f["status"] == "open" and f["triage_group"] != "not_checked"]
@@ -1490,6 +1548,8 @@ def build_markdown_report(report: dict, message_lookup: Dict[str, str], manual_i
             lines.append(f"**Location**: {_display_location(finding)}")
             if _comparison_value(finding):
                 lines.append(f"**Baseline**: {_comparison_value(finding)}")
+            if _blast_radius_value(finding):
+                lines.append(f"**Blast radius**: {_blast_radius_value(finding)}")
             lines.append(f"**Issue**: {_finding_message(finding, message_lookup)}")
             lines.append("**Fix**:")
             lines.append(finding["proposed_fix"]["diff"] or "*(No automatic fix template available)*")
@@ -1507,6 +1567,8 @@ def build_markdown_report(report: dict, message_lookup: Dict[str, str], manual_i
             lines.append(f"**Location**: {_display_location(finding)}")
             if _comparison_value(finding):
                 lines.append(f"**Baseline**: {_comparison_value(finding)}")
+            if _blast_radius_value(finding):
+                lines.append(f"**Blast radius**: {_blast_radius_value(finding)}")
             lines.append(f"**Issue**: {_finding_message(finding, message_lookup)}")
             lines.append(f"**Decision needed**: {finding['decision_required']['question']}")
             current_code = finding["evidence"]["snippet"] or finding["evidence"]["dom_snippet"]
@@ -1527,6 +1589,8 @@ def build_markdown_report(report: dict, message_lookup: Dict[str, str], manual_i
             lines.append(f"**Location**: {_display_location(finding)}")
             if _comparison_value(finding):
                 lines.append(f"**Baseline**: {_comparison_value(finding)}")
+            if _blast_radius_value(finding):
+                lines.append(f"**Blast radius**: {_blast_radius_value(finding)}")
             lines.append(f"**Issue**: {_finding_message(finding, message_lookup)}")
             lines.append("")
     lines.append("These require you to test with actual assistive technology or in the browser. "
@@ -1544,6 +1608,8 @@ def build_markdown_report(report: dict, message_lookup: Dict[str, str], manual_i
             lines.append(f"**Location**: {_display_location(finding)}")
             if _comparison_value(finding):
                 lines.append(f"**Baseline**: {_comparison_value(finding)}")
+            if _blast_radius_value(finding):
+                lines.append(f"**Blast radius**: {_blast_radius_value(finding)}")
             lines.append(f"**Reason**: {waiver.get('reason', '')}")
             lines.append(f"**Approved by**: {waiver.get('approved_by', '')}")
             lines.append(f"**Expires**: {waiver.get('expires_at', '')}")
@@ -1561,6 +1627,8 @@ def build_markdown_report(report: dict, message_lookup: Dict[str, str], manual_i
             lines.append(f"**Status**: {finding['status']}")
             if _comparison_value(finding):
                 lines.append(f"**Baseline**: {_comparison_value(finding)}")
+            if _blast_radius_value(finding):
+                lines.append(f"**Blast radius**: {_blast_radius_value(finding)}")
             lines.append(f"**Reason**: {finding['group_reason']}")
             lines.append("")
         lines.append("---\n")
@@ -1586,6 +1654,7 @@ def main():
     parser.add_argument("--static", type=str, help="Path to static scanner JSON")
     parser.add_argument("--runtime", type=str, help="Path to runtime scanner JSON")
     parser.add_argument("--stateful", type=str, help="Path to stateful scanner JSON")
+    parser.add_argument("--tokens", type=str, help="Path to token scanner JSON")
     parser.add_argument("--baseline-file", type=str, help="Optional baseline JSON to compare against")
     parser.add_argument("--write-baseline", type=str, help="Optional path to write a fresh baseline JSON")
     parser.add_argument("--output", type=str, help="Output markdown path (default: stdout)")
@@ -1594,12 +1663,13 @@ def main():
     parser.add_argument("--detected-at", type=str, help="Override detected_at timestamp (for tests)")
     args = parser.parse_args()
 
-    if not (args.static or args.runtime or args.stateful):
-        parser.error("Provide --static, --runtime, --stateful, or any combination.")
+    if not (args.static or args.runtime or args.stateful or args.tokens):
+        parser.error("Provide --static, --runtime, --stateful, --tokens, or any combination.")
 
     static_data = json.loads(Path(args.static).read_text()) if args.static else None
     runtime_data = json.loads(Path(args.runtime).read_text()) if args.runtime else None
     stateful_data = json.loads(Path(args.stateful).read_text()) if args.stateful else None
+    token_data = json.loads(Path(args.tokens).read_text()) if args.tokens else None
     try:
         baseline_data = load_baseline(args.baseline_file)
     except (ValueError, json.JSONDecodeError) as exc:
@@ -1609,7 +1679,7 @@ def main():
     detected_at = args.detected_at or _now_iso()
     output_dir = _output_dir(args.output, args.json_output)
     status_records = load_status_records(args.status_file)
-    report = build_report_data(static_data, runtime_data, stateful_data, baseline_data, output_dir, detected_at, status_records)
+    report = build_report_data(static_data, runtime_data, stateful_data, token_data, baseline_data, output_dir, detected_at, status_records)
 
     raw_issues = []
     if static_data:
@@ -1618,6 +1688,8 @@ def main():
         raw_issues.extend(runtime_data.get("issues", []))
     if stateful_data:
         raw_issues.extend(stateful_data.get("issues", []))
+    if token_data:
+        raw_issues.extend(token_data.get("issues", []))
     message_lookup = _build_message_lookup(deduplicate(raw_issues))
 
     manual_items = generate_manual_review_items(report, stateful_data)

@@ -1,5 +1,5 @@
 {
-  "schema_version": "2.3.0",
+  "schema_version": "2.4.0",
   "generated_at": "2026-01-02T03:04:05Z",
   "target": "fixtures/waiver-expired",
   "framework": "html",
@@ -68,7 +68,7 @@
       ],
       "severity": "moderate",
       "scanner": "static",
-      "scanner_version": "2.3.0",
+      "scanner_version": "2.4.0",
       "detected_at": "2026-01-02T03:04:05Z",
       "triage_group": "autofix",
       "fix_safety": "safe",
