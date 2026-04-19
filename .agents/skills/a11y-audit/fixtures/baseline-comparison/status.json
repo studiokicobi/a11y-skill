@@ -1,0 +1,14 @@
+{
+  "waivers": [
+    {
+      "match": {
+        "rule_id": "img-missing-alt",
+        "file": "fixtures/baseline-comparison/index.html",
+        "line": 6
+      },
+      "reason": "Marketing is replacing the hero asset in the next content push.",
+      "approved_by": "a11y-lead",
+      "expires_at": "2026-12-31T00:00:00Z"
+    }
+  ]
+}

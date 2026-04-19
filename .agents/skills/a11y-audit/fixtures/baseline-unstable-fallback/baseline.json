@@ -1,0 +1,87 @@
+{
+  "schema_version": "1.0",
+  "fingerprint_version": "1.0",
+  "generated_at": "2026-01-02T03:04:05Z",
+  "target": "fixtures/baseline-unstable-fallback",
+  "framework": "html",
+  "records": [
+    {
+      "fingerprint": "clickable-div|fixtures/baseline-unstable-fallback/index.html|line|line-5",
+      "rule_id": "clickable-div",
+      "origin_rule_id": "",
+      "scanner": "static",
+      "status": "open",
+      "fingerprint_data": {
+        "fingerprint_version": "1.0",
+        "anchor_source": "line",
+        "anchor_value": "line-5",
+        "unstable": true
+      },
+      "location": {
+        "file": "fixtures/baseline-unstable-fallback/index.html",
+        "line": 5,
+        "column": 5,
+        "url": "",
+        "selector": "",
+        "journey_step_id": ""
+      },
+      "finding": {
+        "id": "92190f41d9a0",
+        "rule_id": "clickable-div",
+        "title": "Non-interactive element with click handler",
+        "wcag": [
+          "2.1.1"
+        ],
+        "severity": "serious",
+        "scanner": "static",
+        "scanner_version": "2.3.0",
+        "detected_at": "2026-01-02T03:04:05Z",
+        "triage_group": "autofix",
+        "fix_safety": "safe",
+        "confidence": "high",
+        "status": "open",
+        "waiver": null,
+        "group_reason": "Rule is classified as safe to patch automatically for this evidence source.",
+        "location": {
+          "file": "fixtures/baseline-unstable-fallback/index.html",
+          "line": 5,
+          "column": 5,
+          "url": "",
+          "selector": "",
+          "journey_step_id": ""
+        },
+        "mapping": {
+          "source_file": "",
+          "source_line": 0,
+          "confidence": "low",
+          "explanation": ""
+        },
+        "evidence": {
+          "snippet": "<div onClick=\"save()\">Action</div>",
+          "dom_snippet": "",
+          "screenshot": "",
+          "axe_help_url": ""
+        },
+        "decision_required": {
+          "question": "",
+          "options": []
+        },
+        "proposed_fix": {
+          "kind": "diff",
+          "diff": "```diff\n- <div onClick=\"save()\">Action</div>\n+ <button type=\"button\" onClick=\"save()\">Action</button>\n```",
+          "notes": ""
+        },
+        "fingerprint": "clickable-div|fixtures/baseline-unstable-fallback/index.html|line|line-5",
+        "fingerprint_data": {
+          "fingerprint_version": "1.0",
+          "anchor_source": "line",
+          "anchor_value": "line-5",
+          "unstable": true
+        },
+        "confirmed_by": [
+          "static"
+        ]
+      }
+    }
+  ]
+}

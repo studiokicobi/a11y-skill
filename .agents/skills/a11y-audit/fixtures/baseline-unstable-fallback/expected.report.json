@@ -1,8 +1,8 @@
 {
   "schema_version": "2.3.0",
   "generated_at": "2026-01-02T03:04:05Z",
-  "target": "https://example.test/settings",
-  "framework": "stateful",
+  "target": "fixtures/baseline-unstable-fallback",
+  "framework": "html",
   "standard": "WCAG 2.2 Level AA",
   "summary": {
     "scanner_detected_issue_count": 0,
@@ -28,7 +28,7 @@
       "waived": 0,
       "fixed": 0,
       "resolved": 0,
-      "stale": 0
+      "stale": 1
     }
   },
   "coverage_metadata": {
@@ -47,18 +47,71 @@
     ]
   },
   "baseline_comparison": {
-    "baseline_present": false,
-    "baseline_generated_at": "",
+    "baseline_present": true,
+    "baseline_generated_at": "2026-01-02T03:04:05Z",
     "summary": {
       "new": 0,
       "unchanged": 0,
       "fixed": 0,
       "resolved": 0,
-      "stale": 0,
+      "stale": 1,
       "waived": 0
     }
   },
-  "findings": [],
+  "findings": [
+    {
+      "id": "92190f41d9a0",
+      "rule_id": "clickable-div",
+      "title": "Non-interactive element with click handler",
+      "wcag": [
+        "2.1.1"
+      ],
+      "severity": "serious",
+      "scanner": "static",
+      "scanner_version": "2.3.0",
+      "detected_at": "2026-01-02T03:04:05Z",
+      "triage_group": "autofix",
+      "fix_safety": "safe",
+      "confidence": "high",
+      "status": "stale",
+      "group_reason": "Rule is classified as safe to patch automatically for this evidence source.",
+      "location": {
+        "file": "fixtures/baseline-unstable-fallback/index.html",
+        "line": 5,
+        "column": 5,
+        "url": "",
+        "selector": "",
+        "journey_step_id": ""
+      },
+      "evidence": {
+        "snippet": "<div onClick=\"save()\">Action</div>",
+        "dom_snippet": "",
+        "screenshot": "",
+        "axe_help_url": ""
+      },
+      "decision_required": {
+        "question": "",
+        "options": []
+      },
+      "proposed_fix": {
+        "kind": "diff",
+        "diff": "```diff\n- <div onClick=\"save()\">Action</div>\n+ <button type=\"button\" onClick=\"save()\">Action</button>\n```",
+        "notes": ""
+      },
+      "fingerprint": "clickable-div|fixtures/baseline-unstable-fallback/index.html|line|line-5",
+      "confirmed_by": [
+        "static"
+      ],
+      "waiver": null,
+      "comparison": "stale",
+      "fingerprint_data": {
+        "fingerprint_version": "1.0",
+        "anchor_source": "line",
+        "anchor_value": "line-5",
+        "unstable": true
+      }
+    }
+  ],
   "not_checked": [
     {
       "rule_id": "not-checked-1-2-1",

@@ -1,5 +1,5 @@
 {
-  "schema_version": "2.2.0",
+  "schema_version": "2.3.0",
   "generated_at": "2026-01-02T03:04:05Z",
   "target": "http://localhost:3000",
   "framework": "unknown",
@@ -46,9 +46,21 @@
       "2.3.1"
     ]
   },
+  "baseline_comparison": {
+    "baseline_present": false,
+    "baseline_generated_at": "",
+    "summary": {
+      "new": 0,
+      "unchanged": 0,
+      "fixed": 0,
+      "resolved": 0,
+      "stale": 0,
+      "waived": 0
+    }
+  },
   "findings": [
     {
-      "id": "bdc48032fe5f",
+      "id": "777e1d12e6bc",
       "rule_id": "color-contrast",
       "title": "Color contrast failure (runtime)",
       "wcag": [
@@ -56,7 +68,7 @@
       ],
       "severity": "serious",
       "scanner": "runtime",
-      "scanner_version": "2.2.0",
+      "scanner_version": "2.3.0",
       "detected_at": "2026-01-02T03:04:05Z",
       "triage_group": "needs_input",
       "fix_safety": "input-required",
@@ -86,11 +98,18 @@
         "diff": "",
         "notes": ""
       },
-      "fingerprint": "color-contrast|http://localhost:3000|main > p.muted-copy",
+      "fingerprint": "color-contrast|main > p.muted-copy|http://localhost:3000",
       "confirmed_by": [
         "runtime"
       ],
       "waiver": null,
+      "fingerprint_data": {
+        "fingerprint_version": "1.0",
+        "normalized_selector": "main > p.muted-copy",
+        "page_context": "http://localhost:3000",
+        "page_or_step_context": "http://localhost:3000",
+        "unstable": false
+      },
       "origin_rule_id": "color-contrast"
     }
   ],

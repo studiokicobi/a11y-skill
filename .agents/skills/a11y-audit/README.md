@@ -75,6 +75,15 @@ node scripts/a11y_stateful.js --config journey.config.json --output /tmp/statefu
 # Triage into markdown plus normalized JSON
 python3 scripts/triage.py --static /tmp/static.json --runtime /tmp/runtime.json --stateful /tmp/stateful.json --output report.md --json-output report.json
 
+# Compare a run to an existing baseline
+python3 scripts/triage.py --static /tmp/static.json --json-output report.json --baseline-file baseline.json
+
+# Write a new baseline directly from triage output
+python3 scripts/triage.py --static /tmp/static.json --json-output report.json --write-baseline baseline.json
+
+# Or build a baseline from an existing normalized report
+python3 scripts/baseline.py --report report.json --output baseline.json
+
 # Color contrast check
 python3 scripts/contrast_checker.py --fg "#999" --bg "#fff" --suggest
 ```
@@ -89,7 +98,17 @@ The output is markdown with three sections in this order:
 
 Plus a "Not checked" section listing WCAG criteria that no automated tool can evaluate, so you know the gaps.
 
-When `--json-output` is used, the normalized report includes deterministic `not_checked` findings, status and waiver metadata, `group_reason`, `fingerprint`, and `confirmed_by`.
+When `--json-output` is used, the normalized report includes deterministic `not_checked` findings, status and waiver metadata, `group_reason`, `fingerprint`, `fingerprint_data`, `baseline_comparison`, and `confirmed_by`.
+
+## Baselines and waivers
+
+The normalized JSON report is the source for repeatable regression tracking.
+
+- Use `--write-baseline` on `triage.py`, or `scripts/baseline.py`, to save a stable JSON baseline.
+- Use `--baseline-file` on later runs to classify findings as `new`, `unchanged`, `fixed`, `resolved`, `stale`, or `waived`.
+- Static findings use stable-anchor precedence for fingerprints: `id`, `data-testid`, associated label, `name`, nearest heading, then line fallback.
+- Line-fallback fingerprints are marked `unstable: true` so a disappeared match becomes `stale` rather than being overclaimed as `fixed`.
+- Use `--status-file` on `triage.py` to carry waiver and administrative status records across runs.
 
 ## Runtime config
 

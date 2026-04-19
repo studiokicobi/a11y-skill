@@ -1,0 +1,67 @@
+{
+  "target": "fixtures/baseline-comparison",
+  "framework": "html",
+  "files_scanned": 1,
+  "issue_count": 4,
+  "issues": [
+    {
+      "rule_id": "img-missing-alt",
+      "wcag": "1.1.1",
+      "file": "fixtures/baseline-comparison/index.html",
+      "line": 4,
+      "col": 5,
+      "snippet": "<img id=\"hero-image\" src=\"hero.png\">",
+      "message": "<img> missing alt attribute. Screen readers will read the filename or skip it.",
+      "framework": "html",
+      "triage_hint": "input",
+      "fix_data": {
+        "tag": "<img id=\"hero-image\" src=\"hero.png\">",
+        "pattern": "add_alt"
+      }
+    },
+    {
+      "rule_id": "positive-tabindex",
+      "wcag": "2.4.3",
+      "file": "fixtures/baseline-comparison/index.html",
+      "line": 6,
+      "col": 27,
+      "snippet": "<button id=\"save-btn\" tabindex=\"5\">Save</button>",
+      "message": "tabindex=\"5\" breaks natural tab order. Nearly always should be 0 or removed.",
+      "framework": "html",
+      "triage_hint": "input",
+      "fix_data": {
+        "value": 5,
+        "pattern": "tabindex_review"
+      }
+    },
+    {
+      "rule_id": "clickable-div",
+      "wcag": "2.1.1",
+      "file": "fixtures/baseline-comparison/index.html",
+      "line": 8,
+      "col": 5,
+      "snippet": "<div id=\"legacy-action\" onClick=\"save()\">Save</div>",
+      "message": "<div> with onClick is not keyboard-accessible. Use <button type=\"button\"> or <a href> instead.",
+      "framework": "html",
+      "triage_hint": "auto",
+      "fix_data": {
+        "element": "div",
+        "pattern": "div_to_button"
+      }
+    },
+    {
+      "rule_id": "target-blank-no-noopener",
+      "wcag": "best-practice",
+      "file": "fixtures/baseline-comparison/index.html",
+      "line": 10,
+      "col": 5,
+      "snippet": "<a id=\"docs-link\" href=\"https://example.com\" target=\"_blank\">Docs</a>",
+      "message": "target=\"_blank\" without rel=\"noopener noreferrer\". Security and sometimes accessibility issue.",
+      "framework": "html",
+      "triage_hint": "auto",
+      "fix_data": {
+        "pattern": "add_rel_noopener"
+      }
+    }
+  ]
+}

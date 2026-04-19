@@ -1,5 +1,5 @@
 {
-  "schema_version": "2.2.0",
+  "schema_version": "2.3.0",
   "generated_at": "2026-01-02T03:04:05Z",
   "target": "fixtures/target-blank-merge",
   "framework": "html",
@@ -46,9 +46,21 @@
       "2.3.1"
     ]
   },
+  "baseline_comparison": {
+    "baseline_present": false,
+    "baseline_generated_at": "",
+    "summary": {
+      "new": 0,
+      "unchanged": 0,
+      "fixed": 0,
+      "resolved": 0,
+      "stale": 0,
+      "waived": 0
+    }
+  },
   "findings": [
     {
-      "id": "38265adeeab4",
+      "id": "7c743f6fe840",
       "rule_id": "target-blank-no-noopener",
       "title": "target=\"_blank\" without rel=\"noopener\"",
       "wcag": [
@@ -56,7 +68,7 @@
       ],
       "severity": "moderate",
       "scanner": "static",
-      "scanner_version": "2.2.0",
+      "scanner_version": "2.3.0",
       "detected_at": "2026-01-02T03:04:05Z",
       "triage_group": "autofix",
       "fix_safety": "safe",
@@ -86,11 +98,17 @@
         "diff": "```diff\n- <a href=\"https://example.com\" target=\"_blank\" rel=\"external\">Docs</a>\n+ <a href=\"https://example.com\" target=\"_blank\" rel=\"external noopener noreferrer\">Docs</a>\n```",
         "notes": ""
       },
-      "fingerprint": "target-blank-no-noopener|fixtures/target-blank-merge/index.html|9|a:href:https://example.com",
+      "fingerprint": "target-blank-no-noopener|fixtures/target-blank-merge/index.html|line|line-9",
       "confirmed_by": [
         "static"
       ],
-      "waiver": null
+      "waiver": null,
+      "fingerprint_data": {
+        "fingerprint_version": "1.0",
+        "anchor_source": "line",
+        "anchor_value": "line-9",
+        "unstable": true
+      }
     }
   ],
   "not_checked": [

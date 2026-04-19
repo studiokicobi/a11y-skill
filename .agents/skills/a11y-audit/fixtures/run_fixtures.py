@@ -69,6 +69,7 @@ def normalize_report_json(report: dict) -> dict:
         "standard": report["standard"],
         "summary": report["summary"],
         "coverage_metadata": report["coverage_metadata"],
+        "baseline_comparison": report.get("baseline_comparison", {}),
         "findings": [],
         "not_checked": [],
     }
@@ -106,6 +107,10 @@ def normalize_report_json(report: dict) -> dict:
             "confirmed_by": finding["confirmed_by"],
             "waiver": finding["waiver"],
         }
+        if "comparison" in finding:
+            compact["comparison"] = finding["comparison"]
+        if "fingerprint_data" in finding:
+            compact["fingerprint_data"] = finding["fingerprint_data"]
         if "origin_rule_id" in finding:
             compact["origin_rule_id"] = finding["origin_rule_id"]
         normalized["findings"].append(compact)
@@ -407,6 +412,7 @@ def run_triage_fixture(fixture_dir: Path, update: bool = False) -> bool:
     runtime_path = fixture_dir / "runtime.json"
     stateful_path = fixture_dir / "stateful.json"
     static_path = fixture_dir / "static.json"
+    baseline_path = fixture_dir / "baseline.json"
     status_path = fixture_dir / "status.json"
     output_markdown_path = Path("/tmp/triage-report.md")
     output_json_path = Path("/tmp/triage-report.json")
@@ -427,6 +433,8 @@ def run_triage_fixture(fixture_dir: Path, update: bool = False) -> bool:
         cmd.extend(["--runtime", str(runtime_path)])
     if stateful_path.exists():
         cmd.extend(["--stateful", str(stateful_path)])
+    if baseline_path.exists():
+        cmd.extend(["--baseline-file", str(baseline_path)])
     if status_path.exists():
         cmd.extend(["--status-file", str(status_path)])
 

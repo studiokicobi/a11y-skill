@@ -1,0 +1,321 @@
+{
+  "schema_version": "1.0",
+  "fingerprint_version": "1.0",
+  "generated_at": "2026-01-02T03:04:05Z",
+  "target": "fixtures/baseline-comparison",
+  "framework": "html",
+  "records": [
+    {
+      "fingerprint": "clickable-div|fixtures/baseline-comparison/index.html|id|legacy-action",
+      "rule_id": "clickable-div",
+      "origin_rule_id": "",
+      "scanner": "static",
+      "status": "open",
+      "fingerprint_data": {
+        "fingerprint_version": "1.0",
+        "anchor_source": "id",
+        "anchor_value": "legacy-action",
+        "unstable": false
+      },
+      "location": {
+        "file": "fixtures/baseline-comparison/index.html",
+        "line": 8,
+        "column": 5,
+        "url": "",
+        "selector": "",
+        "journey_step_id": ""
+      },
+      "finding": {
+        "id": "878618f0432e",
+        "rule_id": "clickable-div",
+        "title": "Non-interactive element with click handler",
+        "wcag": [
+          "2.1.1"
+        ],
+        "severity": "serious",
+        "scanner": "static",
+        "scanner_version": "2.3.0",
+        "detected_at": "2026-01-02T03:04:05Z",
+        "triage_group": "autofix",
+        "fix_safety": "safe",
+        "confidence": "high",
+        "status": "open",
+        "waiver": null,
+        "group_reason": "Rule is classified as safe to patch automatically for this evidence source.",
+        "location": {
+          "file": "fixtures/baseline-comparison/index.html",
+          "line": 8,
+          "column": 5,
+          "url": "",
+          "selector": "",
+          "journey_step_id": ""
+        },
+        "mapping": {
+          "source_file": "",
+          "source_line": 0,
+          "confidence": "low",
+          "explanation": ""
+        },
+        "evidence": {
+          "snippet": "<div id=\"legacy-action\" onClick=\"save()\">Save</div>",
+          "dom_snippet": "",
+          "screenshot": "",
+          "axe_help_url": ""
+        },
+        "decision_required": {
+          "question": "",
+          "options": []
+        },
+        "proposed_fix": {
+          "kind": "diff",
+          "diff": "```diff\n- <div id=\"legacy-action\" onClick=\"save()\">Save</div>\n+ <button type=\"button\" id=\"legacy-action\" onClick=\"save()\">Save</button>\n```",
+          "notes": ""
+        },
+        "fingerprint": "clickable-div|fixtures/baseline-comparison/index.html|id|legacy-action",
+        "fingerprint_data": {
+          "fingerprint_version": "1.0",
+          "anchor_source": "id",
+          "anchor_value": "legacy-action",
+          "unstable": false
+        },
+        "confirmed_by": [
+          "static"
+        ]
+      }
+    },
+    {
+      "fingerprint": "img-missing-alt|fixtures/baseline-comparison/index.html|id|hero-image",
+      "rule_id": "img-missing-alt",
+      "origin_rule_id": "",
+      "scanner": "static",
+      "status": "open",
+      "fingerprint_data": {
+        "fingerprint_version": "1.0",
+        "anchor_source": "id",
+        "anchor_value": "hero-image",
+        "unstable": false
+      },
+      "location": {
+        "file": "fixtures/baseline-comparison/index.html",
+        "line": 4,
+        "column": 5,
+        "url": "",
+        "selector": "",
+        "journey_step_id": ""
+      },
+      "finding": {
+        "id": "87d2ca3ebe54",
+        "rule_id": "img-missing-alt",
+        "title": "Image missing alt attribute",
+        "wcag": [
+          "1.1.1"
+        ],
+        "severity": "serious",
+        "scanner": "static",
+        "scanner_version": "2.3.0",
+        "detected_at": "2026-01-02T03:04:05Z",
+        "triage_group": "needs_input",
+        "fix_safety": "input-required",
+        "confidence": "high",
+        "status": "open",
+        "waiver": null,
+        "group_reason": "Finding requires human input, content intent, or scanner uncertainty before remediation.",
+        "location": {
+          "file": "fixtures/baseline-comparison/index.html",
+          "line": 4,
+          "column": 5,
+          "url": "",
+          "selector": "",
+          "journey_step_id": ""
+        },
+        "mapping": {
+          "source_file": "",
+          "source_line": 0,
+          "confidence": "low",
+          "explanation": ""
+        },
+        "evidence": {
+          "snippet": "<img id=\"hero-image\" src=\"hero.png\">",
+          "dom_snippet": "",
+          "screenshot": "",
+          "axe_help_url": ""
+        },
+        "decision_required": {
+          "question": "What does this image convey? (For decorative images, we'll use alt=\"\".)",
+          "options": []
+        },
+        "proposed_fix": {
+          "kind": "none",
+          "diff": "",
+          "notes": ""
+        },
+        "fingerprint": "img-missing-alt|fixtures/baseline-comparison/index.html|id|hero-image",
+        "fingerprint_data": {
+          "fingerprint_version": "1.0",
+          "anchor_source": "id",
+          "anchor_value": "hero-image",
+          "unstable": false
+        },
+        "confirmed_by": [
+          "static"
+        ]
+      }
+    },
+    {
+      "fingerprint": "positive-tabindex|fixtures/baseline-comparison/index.html|id|save-btn",
+      "rule_id": "positive-tabindex",
+      "origin_rule_id": "",
+      "scanner": "static",
+      "status": "open",
+      "fingerprint_data": {
+        "fingerprint_version": "1.0",
+        "anchor_source": "id",
+        "anchor_value": "save-btn",
+        "unstable": false
+      },
+      "location": {
+        "file": "fixtures/baseline-comparison/index.html",
+        "line": 6,
+        "column": 27,
+        "url": "",
+        "selector": "",
+        "journey_step_id": ""
+      },
+      "finding": {
+        "id": "530ae9f9a202",
+        "rule_id": "positive-tabindex",
+        "title": "Positive tabindex disrupts tab order",
+        "wcag": [
+          "2.4.3"
+        ],
+        "severity": "moderate",
+        "scanner": "static",
+        "scanner_version": "2.3.0",
+        "detected_at": "2026-01-02T03:04:05Z",
+        "triage_group": "needs_input",
+        "fix_safety": "input-required",
+        "confidence": "high",
+        "status": "open",
+        "waiver": null,
+        "group_reason": "Finding requires human input, content intent, or scanner uncertainty before remediation.",
+        "location": {
+          "file": "fixtures/baseline-comparison/index.html",
+          "line": 6,
+          "column": 27,
+          "url": "",
+          "selector": "",
+          "journey_step_id": ""
+        },
+        "mapping": {
+          "source_file": "",
+          "source_line": 0,
+          "confidence": "low",
+          "explanation": ""
+        },
+        "evidence": {
+          "snippet": "<button id=\"save-btn\" tabindex=\"5\">Save</button>",
+          "dom_snippet": "",
+          "screenshot": "",
+          "axe_help_url": ""
+        },
+        "decision_required": {
+          "question": "Is this tab order deliberate? If not, we'll remove the positive tabindex.",
+          "options": []
+        },
+        "proposed_fix": {
+          "kind": "none",
+          "diff": "",
+          "notes": ""
+        },
+        "fingerprint": "positive-tabindex|fixtures/baseline-comparison/index.html|id|save-btn",
+        "fingerprint_data": {
+          "fingerprint_version": "1.0",
+          "anchor_source": "id",
+          "anchor_value": "save-btn",
+          "unstable": false
+        },
+        "confirmed_by": [
+          "static"
+        ]
+      }
+    },
+    {
+      "fingerprint": "target-blank-no-noopener|fixtures/baseline-comparison/index.html|id|docs-link",
+      "rule_id": "target-blank-no-noopener",
+      "origin_rule_id": "",
+      "scanner": "static",
+      "status": "resolved",
+      "fingerprint_data": {
+        "fingerprint_version": "1.0",
+        "anchor_source": "id",
+        "anchor_value": "docs-link",
+        "unstable": false
+      },
+      "location": {
+        "file": "fixtures/baseline-comparison/index.html",
+        "line": 10,
+        "column": 5,
+        "url": "",
+        "selector": "",
+        "journey_step_id": ""
+      },
+      "finding": {
+        "id": "db9572362405",
+        "rule_id": "target-blank-no-noopener",
+        "title": "target=\"_blank\" without rel=\"noopener\"",
+        "wcag": [
+          "best-practice"
+        ],
+        "severity": "moderate",
+        "scanner": "static",
+        "scanner_version": "2.3.0",
+        "detected_at": "2026-01-02T03:04:05Z",
+        "triage_group": "autofix",
+        "fix_safety": "safe",
+        "confidence": "high",
+        "status": "resolved",
+        "waiver": null,
+        "group_reason": "Finding status is resolved; it is tracked for reporting but not surfaced in active remediation groups.",
+        "location": {
+          "file": "fixtures/baseline-comparison/index.html",
+          "line": 10,
+          "column": 5,
+          "url": "",
+          "selector": "",
+          "journey_step_id": ""
+        },
+        "mapping": {
+          "source_file": "",
+          "source_line": 0,
+          "confidence": "low",
+          "explanation": ""
+        },
+        "evidence": {
+          "snippet": "<a id=\"docs-link\" href=\"https://example.com\" target=\"_blank\">Docs</a>",
+          "dom_snippet": "",
+          "screenshot": "",
+          "axe_help_url": ""
+        },
+        "decision_required": {
+          "question": "",
+          "options": []
+        },
+        "proposed_fix": {
+          "kind": "diff",
+          "diff": "```diff\n- <a id=\"docs-link\" href=\"https://example.com\" target=\"_blank\">Docs</a>\n+ <a id=\"docs-link\" href=\"https://example.com\" target=\"_blank\" rel=\"noopener noreferrer\">Docs</a>\n```",
+          "notes": ""
+        },
+        "fingerprint": "target-blank-no-noopener|fixtures/baseline-comparison/index.html|id|docs-link",
+        "fingerprint_data": {
+          "fingerprint_version": "1.0",
+          "anchor_source": "id",
+          "anchor_value": "docs-link",
+          "unstable": false
+        },
+        "confirmed_by": [
+          "static"
+        ]
+      }
+    }
+  ]
+}

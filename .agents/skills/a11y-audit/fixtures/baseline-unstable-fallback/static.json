@@ -1,0 +1,7 @@
+{
+  "target": "fixtures/baseline-unstable-fallback",
+  "framework": "html",
+  "files_scanned": 1,
+  "issue_count": 0,
+  "issues": []
+}

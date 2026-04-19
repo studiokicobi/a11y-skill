@@ -77,6 +77,23 @@ python3 scripts/triage.py --static /tmp/a11y-static.json --runtime /tmp/a11y-run
 
 The script applies the triage rules in `references/triage-rules.md`. Read that file before making triage decisions manually — do not classify issues from memory.
 
+For repeated scans, compare against a saved baseline and carry status/waiver records:
+```bash
+python3 scripts/triage.py \
+  --static /tmp/a11y-static.json \
+  --runtime /tmp/a11y-runtime.json \
+  --stateful /tmp/a11y-stateful.json \
+  --status-file status.json \
+  --baseline-file baseline.json \
+  --output /tmp/a11y-report.md \
+  --json-output /tmp/a11y-report.json
+```
+
+To save a fresh baseline after a confirmed run:
+```bash
+python3 scripts/baseline.py --report /tmp/a11y-report.json --output baseline.json
+```
+
 ### Step 4: Present the report
 
 Show the report to the user. Lead with a one-line summary:

@@ -21,10 +21,12 @@ import sys
 from collections import defaultdict
 from datetime import date, datetime, timezone
 from pathlib import Path
-from typing import Dict, Iterable, List, Optional
+from typing import Dict, Iterable, List, Optional, Tuple
+
+from baseline import FINGERPRINT_VERSION, build_baseline, compare_findings, load_baseline
 
 
-SCANNER_VERSION = "2.2.0"
+SCANNER_VERSION = "2.3.0"
 STANDARD = "WCAG 2.2 Level AA"
 DEFAULT_CONFIDENCE = "medium"
 REPORT_GROUPS = ("autofix", "needs_input", "manual_review", "not_checked")
@@ -34,6 +36,11 @@ CONFIDENCE_VALUES = {"high", "medium", "low"}
 SEVERITY_VALUES = {"minor", "moderate", "serious", "critical", "n/a"}
 SCANNER_VALUES = {"static", "runtime", "stateful", "manual-template", "token"}
 COVERAGE_PATH = Path(__file__).resolve().parent.parent / "references" / "wcag_coverage.md"
+SOURCE_TEXT_CACHE: Dict[str, str] = {}
+ID_ATTR_RE = re.compile(r'\bid\s*=\s*["\']([^"\']+)["\']', re.IGNORECASE)
+DATA_TESTID_ATTR_RE = re.compile(r'\bdata-testid\s*=\s*["\']([^"\']+)["\']', re.IGNORECASE)
+NAME_ATTR_RE = re.compile(r'\bname\s*=\s*["\']([^"\']+)["\']', re.IGNORECASE)
+HEADING_TAG_RE = re.compile(r"<h([1-6])\b[^>]*>(.*?)</h\1>", re.IGNORECASE | re.DOTALL)
 
 
 # Rule → triage group mapping. For anything not in this map, we fall back to
@@ -146,6 +153,126 @@ def _slugify(value: str) -> str:
 def _suggest_input_id(issue: dict, fix_data: dict) -> str:
     base = fix_data.get("name") or fix_data.get("placeholder") or "field"
     return f"{_slugify(base)}-{issue.get('line', 0)}"
+
+
+def _read_source_text(path_str: str) -> str:
+    if not path_str:
+        return ""
+    if path_str not in SOURCE_TEXT_CACHE:
+        candidate = Path(path_str)
+        if not candidate.exists() and not candidate.is_absolute():
+            candidate = Path(__file__).resolve().parent.parent / path_str
+        try:
+            SOURCE_TEXT_CACHE[path_str] = candidate.read_text(encoding="utf-8", errors="ignore")
+        except OSError:
+            SOURCE_TEXT_CACHE[path_str] = ""
+    return SOURCE_TEXT_CACHE[path_str]
+
+
+def _find_attr(snippet: str, pattern: re.Pattern) -> str:
+    if not snippet:
+        return ""
+    match = pattern.search(snippet)
+    return match.group(1).strip() if match else ""
+
+
+def _strip_html(value: str) -> str:
+    if not value:
+        return ""
+    value = re.sub(r"<[^>]+>", " ", value)
+    value = re.sub(r"\s+", " ", value).strip()
+    return value
+
+
+def _associated_label_text(text: str, snippet: str) -> str:
+    element_id = _find_attr(snippet, ID_ATTR_RE)
+    if not element_id or not text:
+        return ""
+    pattern = re.compile(
+        rf'<label\b[^>]*\bfor\s*=\s*["\']{re.escape(element_id)}["\'][^>]*>(.*?)</label>',
+        re.IGNORECASE | re.DOTALL,
+    )
+    match = pattern.search(text)
+    return _strip_html(match.group(1)) if match else ""
+
+
+def _nearest_heading_text(text: str, line_number: int) -> str:
+    if not text or line_number <= 0:
+        return ""
+    last_heading = ""
+    for match in HEADING_TAG_RE.finditer(text):
+        heading_line = text.count("\n", 0, match.start()) + 1
+        if heading_line > line_number:
+            break
+        candidate = _strip_html(match.group(2))
+        if candidate:
+            last_heading = candidate
+    return last_heading
+
+
+def _normalize_selector_value(selector: str) -> str:
+    normalized = re.sub(r"\s+", " ", (selector or "").strip())
+    normalized = re.sub(r":nth-child\(\d+\)", ":nth-child(*)", normalized)
+    return normalized
+
+
+def _static_fingerprint_data(issue: dict) -> dict:
+    snippet = issue.get("snippet", "")
+    source_file = str(issue.get("file", ""))
+    source_text = _read_source_text(source_file)
+
+    anchor_value = _find_attr(snippet, ID_ATTR_RE)
+    anchor_source = "id" if anchor_value else ""
+
+    if not anchor_value:
+        anchor_value = _find_attr(snippet, DATA_TESTID_ATTR_RE)
+        anchor_source = "data-testid" if anchor_value else ""
+
+    if not anchor_value:
+        anchor_value = _associated_label_text(source_text, snippet)
+        anchor_source = "label" if anchor_value else ""
+
+    if not anchor_value:
+        anchor_value = _find_attr(snippet, NAME_ATTR_RE)
+        anchor_source = "name" if anchor_value else ""
+
+    if not anchor_value:
+        anchor_value = _nearest_heading_text(source_text, int(issue.get("line", 0) or 0))
+        anchor_source = "heading" if anchor_value else ""
+
+    unstable = False
+    if not anchor_value:
+        anchor_value = f"line-{issue.get('line', 0)}"
+        anchor_source = "line"
+        unstable = True
+
+    return {
+        "fingerprint_version": FINGERPRINT_VERSION,
+        "anchor_source": anchor_source,
+        "anchor_value": anchor_value,
+        "unstable": unstable,
+    }
+
+
+def _runtime_fingerprint_data(issue: dict, scanner: str) -> dict:
+    selector = _normalize_selector_value(issue.get("fix_data", {}).get("target", "") or _signature(issue.get("snippet", "")))
+    page_context = str(issue.get("file", ""))
+    step_id = issue.get("journey_step_id", "") or issue.get("fix_data", {}).get("journey_step_id", "")
+    page_or_step_context = page_context if scanner == "runtime" else f"{page_context}|{step_id}"
+    unstable = not bool(selector)
+    return {
+        "fingerprint_version": FINGERPRINT_VERSION,
+        "normalized_selector": selector or "unknown",
+        "page_context": page_context,
+        "page_or_step_context": page_or_step_context,
+        "unstable": unstable,
+    }
+
+
+def _fingerprint_data(issue: dict, scanner: str) -> dict:
+    if scanner == "static":
+        return _static_fingerprint_data(issue)
+    return _runtime_fingerprint_data(issue, scanner)
 
 
 def diff(before: str, after: str) -> str:
@@ -488,29 +615,23 @@ def _confirmed_by(issue: dict, scanner: str) -> List[str]:
     return sorted(confirmed)
 
 
-def _fingerprint(issue: dict, scanner: str) -> str:
-    selector = issue.get("fix_data", {}).get("target", "")
-    snippet_sig = _signature(issue.get("snippet", ""))
-    step_id = issue.get("journey_step_id", "") or issue.get("fix_data", {}).get("journey_step_id", "")
-    if scanner == "stateful":
-        return "|".join([
+def _fingerprint(issue: dict, scanner: str) -> Tuple[str, dict]:
+    data = _fingerprint_data(issue, scanner)
+    if scanner == "static":
+        fingerprint = "|".join([
             issue["rule_id"],
             str(issue.get("file", "")),
-            selector or snippet_sig,
-            step_id,
+            data["anchor_source"],
+            data["anchor_value"],
         ])
-    if scanner == "runtime":
-        return "|".join([
-            issue["rule_id"],
-            str(issue.get("file", "")),
-            selector or snippet_sig,
-        ])
-    return "|".join([
+        return fingerprint, data
+
+    fingerprint = "|".join([
         issue["rule_id"],
-        str(issue.get("file", "")),
-        str(issue.get("line", 0)),
-        snippet_sig,
+        data["normalized_selector"],
+        data["page_or_step_context"],
     ])
+    return fingerprint, data
 
 
 def _finding_id(fingerprint: str) -> str:
@@ -563,7 +684,7 @@ def normalize_finding(issue: dict, detected_at: str, output_dir: Path) -> dict:
         "input": "needs_input",
         "manual": "manual_review",
     }.get(classify(issue), "needs_input")
-    fingerprint = _fingerprint(issue, scanner)
+    fingerprint, fingerprint_data = _fingerprint(issue, scanner)
     normalized = {
         "id": _finding_id(fingerprint),
         "rule_id": issue["rule_id"],
@@ -590,6 +711,7 @@ def normalize_finding(issue: dict, detected_at: str, output_dir: Path) -> dict:
         "decision_required": _decision_required(issue, triage_group),
         "proposed_fix": _proposed_fix(issue, triage_group),
         "fingerprint": fingerprint,
+        "fingerprint_data": fingerprint_data,
         "confirmed_by": _confirmed_by(issue, scanner),
     }
     origin_rule_id = _origin_rule_id(issue)
@@ -677,7 +799,7 @@ def _status_record_matches(record: dict, finding: dict) -> bool:
     return True
 
 
-def apply_status_records(findings: List[dict], records: List[dict], detected_at: str) -> List[dict]:
+def apply_status_overrides(findings: List[dict], records: List[dict], detected_at: str) -> None:
     detected_at_dt = _parse_iso(detected_at)
     for finding in findings:
         for record in records:
@@ -710,6 +832,8 @@ def apply_status_records(findings: List[dict], records: List[dict], detected_at:
             finding["waiver"] = None
             finding["group_reason"] = _group_reason(finding, finding["triage_group"], status)
 
+
+def historical_findings_from_records(findings: List[dict], records: List[dict], detected_at: str) -> List[dict]:
     existing_fingerprints = {finding["fingerprint"] for finding in findings}
     historical = []
     for record in records:
@@ -721,9 +845,7 @@ def apply_status_records(findings: List[dict], records: List[dict], detected_at:
             continue
         existing_fingerprints.add(fingerprint)
         historical.append(finding)
-
-    findings.extend(historical)
-    return findings
+    return historical
 
 
 def load_wcag_coverage() -> List[dict]:
@@ -886,6 +1008,8 @@ def validate_report_schema(report: dict) -> None:
     for field in ("schema_version", "generated_at", "target", "framework", "standard", "findings", "summary", "coverage_metadata"):
         if field not in report:
             raise ValueError(f"Missing report field: {field}")
+    if "baseline_comparison" in report and not isinstance(report["baseline_comparison"], dict):
+        raise ValueError("baseline_comparison must be an object when present")
     if not isinstance(report["findings"], list):
         raise ValueError("Report findings must be an array")
     for finding in report["findings"]:
@@ -896,6 +1020,7 @@ def build_report_data(
     static_data: Optional[dict],
     runtime_data: Optional[dict],
     stateful_data: Optional[dict],
+    baseline_data: Optional[dict],
     output_dir: Path,
     detected_at: str,
     status_records: List[dict],
@@ -908,11 +1033,14 @@ def build_report_data(
     if stateful_data:
         issues.extend(stateful_data.get("issues", []))
 
-    normalized_findings = [
+    current_findings = [
         normalize_finding(issue, detected_at, output_dir)
         for issue in deduplicate(issues)
     ]
-    normalized_findings = apply_status_records(normalized_findings, status_records, detected_at)
+    apply_status_overrides(current_findings, status_records, detected_at)
+    compared_findings, baseline_summary = compare_findings(current_findings, baseline_data)
+    historical_findings = historical_findings_from_records(compared_findings, status_records, detected_at)
+    normalized_findings = compared_findings + historical_findings
     normalized_findings.extend(build_not_checked_findings(detected_at))
     normalized_findings = _sort_findings(normalized_findings)
 
@@ -973,6 +1101,7 @@ def build_report_data(
             "manual_checklist_included": True,
             "not_checked_criteria": [finding["wcag"][0] for finding in not_checked_findings],
         },
+        "baseline_comparison": baseline_summary,
         "findings": normalized_findings,
     }
     validate_report_schema(report)
@@ -1279,6 +1408,10 @@ def _finding_message(finding: dict, message_lookup: Dict[str, str]) -> str:
     return message_lookup.get(finding["fingerprint"], "") or finding["title"]
 
 
+def _comparison_value(finding: dict) -> str:
+    return str(finding.get("comparison", "") or "")
+
+
 def build_markdown_report(report: dict, message_lookup: Dict[str, str], manual_items: List[dict], step_failures: List[dict]) -> str:
     findings = report["findings"]
     active_findings = [f for f in findings if f["status"] == "open" and f["triage_group"] != "not_checked"]
@@ -1336,6 +1469,15 @@ def build_markdown_report(report: dict, message_lookup: Dict[str, str], manual_i
             if status != "open" and count
         ]
         lines.append(f"Tracked statuses: {', '.join(status_parts)}.")
+    baseline_comparison = report.get("baseline_comparison", {})
+    if baseline_comparison.get("baseline_present"):
+        baseline_parts = [
+            f"{name} {count}"
+            for name, count in baseline_comparison.get("summary", {}).items()
+            if count
+        ]
+        if baseline_parts:
+            lines.append(f"Regression summary: {', '.join(baseline_parts)}.")
     lines.append("")
     lines.append("---\n")
 
@@ -1346,6 +1488,8 @@ def build_markdown_report(report: dict, message_lookup: Dict[str, str], manual_i
         for index, finding in enumerate(auto_issues, start=1):
             lines.append(f"### {index}. [WCAG {finding['wcag'][0] if finding['wcag'] else 'best-practice'}] — {finding['title']}")
             lines.append(f"**Location**: {_display_location(finding)}")
+            if _comparison_value(finding):
+                lines.append(f"**Baseline**: {_comparison_value(finding)}")
             lines.append(f"**Issue**: {_finding_message(finding, message_lookup)}")
             lines.append("**Fix**:")
             lines.append(finding["proposed_fix"]["diff"] or "*(No automatic fix template available)*")
@@ -1361,6 +1505,8 @@ def build_markdown_report(report: dict, message_lookup: Dict[str, str], manual_i
         for index, finding in enumerate(input_issues, start=1):
             lines.append(f"### {index}. [WCAG {finding['wcag'][0] if finding['wcag'] else 'best-practice'}] — {finding['title']}")
             lines.append(f"**Location**: {_display_location(finding)}")
+            if _comparison_value(finding):
+                lines.append(f"**Baseline**: {_comparison_value(finding)}")
             lines.append(f"**Issue**: {_finding_message(finding, message_lookup)}")
             lines.append(f"**Decision needed**: {finding['decision_required']['question']}")
             current_code = finding["evidence"]["snippet"] or finding["evidence"]["dom_snippet"]
@@ -1379,6 +1525,8 @@ def build_markdown_report(report: dict, message_lookup: Dict[str, str], manual_i
         for index, finding in enumerate(manual_issues, start=1):
             lines.append(f"### {index}. [WCAG {finding['wcag'][0] if finding['wcag'] else 'best-practice'}] — {finding['title']}")
             lines.append(f"**Location**: {_display_location(finding)}")
+            if _comparison_value(finding):
+                lines.append(f"**Baseline**: {_comparison_value(finding)}")
             lines.append(f"**Issue**: {_finding_message(finding, message_lookup)}")
             lines.append("")
     lines.append("These require you to test with actual assistive technology or in the browser. "
@@ -1394,6 +1542,8 @@ def build_markdown_report(report: dict, message_lookup: Dict[str, str], manual_i
             waiver = finding["waiver"] or {}
             lines.append(f"### {index}. [WCAG {finding['wcag'][0] if finding['wcag'] else 'best-practice'}] — {finding['title']}")
             lines.append(f"**Location**: {_display_location(finding)}")
+            if _comparison_value(finding):
+                lines.append(f"**Baseline**: {_comparison_value(finding)}")
             lines.append(f"**Reason**: {waiver.get('reason', '')}")
             lines.append(f"**Approved by**: {waiver.get('approved_by', '')}")
             lines.append(f"**Expires**: {waiver.get('expires_at', '')}")
@@ -1409,6 +1559,8 @@ def build_markdown_report(report: dict, message_lookup: Dict[str, str], manual_i
             lines.append(f"### {index}. [WCAG {finding['wcag'][0] if finding['wcag'] else 'best-practice'}] — {finding['title']}")
             lines.append(f"**Location**: {_display_location(finding)}")
             lines.append(f"**Status**: {finding['status']}")
+            if _comparison_value(finding):
+                lines.append(f"**Baseline**: {_comparison_value(finding)}")
             lines.append(f"**Reason**: {finding['group_reason']}")
             lines.append("")
         lines.append("---\n")
@@ -1424,7 +1576,7 @@ def build_markdown_report(report: dict, message_lookup: Dict[str, str], manual_i
 
 def _build_message_lookup(issues: List[dict]) -> Dict[str, str]:
     return {
-        _fingerprint(issue, _infer_scanner(issue)): issue.get("message", "")
+        _fingerprint(issue, _infer_scanner(issue))[0]: issue.get("message", "")
         for issue in issues
     }
 
@@ -1434,6 +1586,8 @@ def main():
     parser.add_argument("--static", type=str, help="Path to static scanner JSON")
     parser.add_argument("--runtime", type=str, help="Path to runtime scanner JSON")
     parser.add_argument("--stateful", type=str, help="Path to stateful scanner JSON")
+    parser.add_argument("--baseline-file", type=str, help="Optional baseline JSON to compare against")
+    parser.add_argument("--write-baseline", type=str, help="Optional path to write a fresh baseline JSON")
     parser.add_argument("--output", type=str, help="Output markdown path (default: stdout)")
     parser.add_argument("--json-output", type=str, help="Output normalized JSON report")
     parser.add_argument("--status-file", type=str, help="Optional JSON file with status/waiver records")
@@ -1446,11 +1600,16 @@ def main():
     static_data = json.loads(Path(args.static).read_text()) if args.static else None
     runtime_data = json.loads(Path(args.runtime).read_text()) if args.runtime else None
     stateful_data = json.loads(Path(args.stateful).read_text()) if args.stateful else None
+    try:
+        baseline_data = load_baseline(args.baseline_file)
+    except (ValueError, json.JSONDecodeError) as exc:
+        print(f"Baseline error: {exc}", file=sys.stderr)
+        sys.exit(3)
 
     detected_at = args.detected_at or _now_iso()
     output_dir = _output_dir(args.output, args.json_output)
     status_records = load_status_records(args.status_file)
-    report = build_report_data(static_data, runtime_data, stateful_data, output_dir, detected_at, status_records)
+    report = build_report_data(static_data, runtime_data, stateful_data, baseline_data, output_dir, detected_at, status_records)
 
     raw_issues = []
     if static_data:
@@ -1474,6 +1633,11 @@ def main():
     if args.json_output:
         Path(args.json_output).write_text(json.dumps(report, indent=2), encoding="utf-8")
         print(f"JSON report written to {args.json_output}", file=sys.stderr)
+
+    if args.write_baseline:
+        baseline_output = build_baseline(report)
+        Path(args.write_baseline).write_text(json.dumps(baseline_output, indent=2), encoding="utf-8")
+        print(f"Baseline written to {args.write_baseline}", file=sys.stderr)
 
 
 if __name__ == "__main__":

@@ -1,0 +1,410 @@
+{
+  "schema_version": "2.3.0",
+  "generated_at": "2026-01-02T03:04:05Z",
+  "target": "fixtures/baseline-comparison",
+  "framework": "html",
+  "standard": "WCAG 2.2 Level AA",
+  "summary": {
+    "scanner_detected_issue_count": 2,
+    "auto_fixable_count": 0,
+    "needs_input_count": 2,
+    "manual_review_count": 0,
+    "waived_count": 1,
+    "not_checked_count": 9,
+    "by_scanner": {
+      "static": 2,
+      "runtime": 0,
+      "stateful": 0,
+      "manual-template": 0,
+      "token": 0
+    },
+    "by_confidence": {
+      "high": 2,
+      "medium": 0,
+      "low": 0
+    },
+    "status_counts": {
+      "open": 2,
+      "waived": 1,
+      "fixed": 1,
+      "resolved": 1,
+      "stale": 0
+    }
+  },
+  "coverage_metadata": {
+    "coverage_source": "references/wcag_coverage.md",
+    "manual_checklist_included": true,
+    "not_checked_criteria": [
+      "1.2.1",
+      "1.2.2",
+      "1.2.3",
+      "1.2.4",
+      "1.2.5",
+      "1.4.2",
+      "2.2.1",
+      "2.2.2",
+      "2.3.1"
+    ]
+  },
+  "baseline_comparison": {
+    "baseline_present": true,
+    "baseline_generated_at": "2026-01-02T03:04:05Z",
+    "summary": {
+      "new": 1,
+      "unchanged": 1,
+      "fixed": 1,
+      "resolved": 1,
+      "stale": 0,
+      "waived": 1
+    }
+  },
+  "findings": [
+    {
+      "id": "d1da9740f994",
+      "rule_id": "input-missing-label",
+      "title": "Input missing label",
+      "wcag": [
+        "1.3.1"
+      ],
+      "severity": "serious",
+      "scanner": "static",
+      "scanner_version": "2.3.0",
+      "detected_at": "2026-01-02T03:04:05Z",
+      "triage_group": "needs_input",
+      "fix_safety": "input-required",
+      "confidence": "high",
+      "status": "open",
+      "group_reason": "Finding requires human input, content intent, or scanner uncertainty before remediation.",
+      "location": {
+        "file": "fixtures/baseline-comparison/index.html",
+        "line": 15,
+        "column": 7,
+        "url": "",
+        "selector": "",
+        "journey_step_id": ""
+      },
+      "evidence": {
+        "snippet": "<input name=\"email\">",
+        "dom_snippet": "",
+        "screenshot": "",
+        "axe_help_url": ""
+      },
+      "decision_required": {
+        "question": "What should this input be labeled?",
+        "options": []
+      },
+      "proposed_fix": {
+        "kind": "none",
+        "diff": "",
+        "notes": ""
+      },
+      "fingerprint": "input-missing-label|fixtures/baseline-comparison/index.html|name|email",
+      "confirmed_by": [
+        "static"
+      ],
+      "waiver": null,
+      "comparison": "new",
+      "fingerprint_data": {
+        "fingerprint_version": "1.0",
+        "anchor_source": "name",
+        "anchor_value": "email",
+        "unstable": false
+      }
+    },
+    {
+      "id": "530ae9f9a202",
+      "rule_id": "positive-tabindex",
+      "title": "Positive tabindex disrupts tab order",
+      "wcag": [
+        "2.4.3"
+      ],
+      "severity": "moderate",
+      "scanner": "static",
+      "scanner_version": "2.3.0",
+      "detected_at": "2026-01-02T03:04:05Z",
+      "triage_group": "needs_input",
+      "fix_safety": "input-required",
+      "confidence": "high",
+      "status": "open",
+      "group_reason": "Finding requires human input, content intent, or scanner uncertainty before remediation.",
+      "location": {
+        "file": "fixtures/baseline-comparison/index.html",
+        "line": 11,
+        "column": 29,
+        "url": "",
+        "selector": "",
+        "journey_step_id": ""
+      },
+      "evidence": {
+        "snippet": "<button id=\"save-btn\" tabindex=\"5\">Save</button>",
+        "dom_snippet": "",
+        "screenshot": "",
+        "axe_help_url": ""
+      },
+      "decision_required": {
+        "question": "Is this tab order deliberate? If not, we'll remove the positive tabindex.",
+        "options": []
+      },
+      "proposed_fix": {
+        "kind": "none",
+        "diff": "",
+        "notes": ""
+      },
+      "fingerprint": "positive-tabindex|fixtures/baseline-comparison/index.html|id|save-btn",
+      "confirmed_by": [
+        "static"
+      ],
+      "waiver": null,
+      "comparison": "unchanged",
+      "fingerprint_data": {
+        "fingerprint_version": "1.0",
+        "anchor_source": "id",
+        "anchor_value": "save-btn",
+        "unstable": false
+      }
+    },
+    {
+      "id": "878618f0432e",
+      "rule_id": "clickable-div",
+      "title": "Non-interactive element with click handler",
+      "wcag": [
+        "2.1.1"
+      ],
+      "severity": "serious",
+      "scanner": "static",
+      "scanner_version": "2.3.0",
+      "detected_at": "2026-01-02T03:04:05Z",
+      "triage_group": "autofix",
+      "fix_safety": "safe",
+      "confidence": "high",
+      "status": "fixed",
+      "group_reason": "Rule is classified as safe to patch automatically for this evidence source.",
+      "location": {
+        "file": "fixtures/baseline-comparison/index.html",
+        "line": 8,
+        "column": 5,
+        "url": "",
+        "selector": "",
+        "journey_step_id": ""
+      },
+      "evidence": {
+        "snippet": "<div id=\"legacy-action\" onClick=\"save()\">Save</div>",
+        "dom_snippet": "",
+        "screenshot": "",
+        "axe_help_url": ""
+      },
+      "decision_required": {
+        "question": "",
+        "options": []
+      },
+      "proposed_fix": {
+        "kind": "diff",
+        "diff": "```diff\n- <div id=\"legacy-action\" onClick=\"save()\">Save</div>\n+ <button type=\"button\" id=\"legacy-action\" onClick=\"save()\">Save</button>\n```",
+        "notes": ""
+      },
+      "fingerprint": "clickable-div|fixtures/baseline-comparison/index.html|id|legacy-action",
+      "confirmed_by": [
+        "static"
+      ],
+      "waiver": null,
+      "comparison": "fixed",
+      "fingerprint_data": {
+        "fingerprint_version": "1.0",
+        "anchor_source": "id",
+        "anchor_value": "legacy-action",
+        "unstable": false
+      }
+    },
+    {
+      "id": "db9572362405",
+      "rule_id": "target-blank-no-noopener",
+      "title": "target=\"_blank\" without rel=\"noopener\"",
+      "wcag": [
+        "best-practice"
+      ],
+      "severity": "moderate",
+      "scanner": "static",
+      "scanner_version": "2.3.0",
+      "detected_at": "2026-01-02T03:04:05Z",
+      "triage_group": "autofix",
+      "fix_safety": "safe",
+      "confidence": "high",
+      "status": "resolved",
+      "group_reason": "Finding status is resolved; it is tracked for reporting but not surfaced in active remediation groups.",
+      "location": {
+        "file": "fixtures/baseline-comparison/index.html",
+        "line": 10,
+        "column": 5,
+        "url": "",
+        "selector": "",
+        "journey_step_id": ""
+      },
+      "evidence": {
+        "snippet": "<a id=\"docs-link\" href=\"https://example.com\" target=\"_blank\">Docs</a>",
+        "dom_snippet": "",
+        "screenshot": "",
+        "axe_help_url": ""
+      },
+      "decision_required": {
+        "question": "",
+        "options": []
+      },
+      "proposed_fix": {
+        "kind": "diff",
+        "diff": "```diff\n- <a id=\"docs-link\" href=\"https://example.com\" target=\"_blank\">Docs</a>\n+ <a id=\"docs-link\" href=\"https://example.com\" target=\"_blank\" rel=\"noopener noreferrer\">Docs</a>\n```",
+        "notes": ""
+      },
+      "fingerprint": "target-blank-no-noopener|fixtures/baseline-comparison/index.html|id|docs-link",
+      "confirmed_by": [
+        "static"
+      ],
+      "waiver": null,
+      "comparison": "resolved",
+      "fingerprint_data": {
+        "fingerprint_version": "1.0",
+        "anchor_source": "id",
+        "anchor_value": "docs-link",
+        "unstable": false
+      }
+    },
+    {
+      "id": "87d2ca3ebe54",
+      "rule_id": "img-missing-alt",
+      "title": "Image missing alt attribute",
+      "wcag": [
+        "1.1.1"
+      ],
+      "severity": "serious",
+      "scanner": "static",
+      "scanner_version": "2.3.0",
+      "detected_at": "2026-01-02T03:04:05Z",
+      "triage_group": "needs_input",
+      "fix_safety": "input-required",
+      "confidence": "high",
+      "status": "waived",
+      "group_reason": "Finding matched an active waiver record and was moved out of the active remediation groups.",
+      "location": {
+        "file": "fixtures/baseline-comparison/index.html",
+        "line": 6,
+        "column": 7,
+        "url": "",
+        "selector": "",
+        "journey_step_id": ""
+      },
+      "evidence": {
+        "snippet": "<img id=\"hero-image\" src=\"hero.png\">",
+        "dom_snippet": "",
+        "screenshot": "",
+        "axe_help_url": ""
+      },
+      "decision_required": {
+        "question": "What does this image convey? (For decorative images, we'll use alt=\"\".)",
+        "options": []
+      },
+      "proposed_fix": {
+        "kind": "none",
+        "diff": "",
+        "notes": ""
+      },
+      "fingerprint": "img-missing-alt|fixtures/baseline-comparison/index.html|id|hero-image",
+      "confirmed_by": [
+        "static"
+      ],
+      "waiver": {
+        "reason": "Marketing is replacing the hero asset in the next content push.",
+        "approved_by": "a11y-lead",
+        "expires_at": "2026-12-31T00:00:00Z"
+      },
+      "comparison": "waived",
+      "fingerprint_data": {
+        "fingerprint_version": "1.0",
+        "anchor_source": "id",
+        "anchor_value": "hero-image",
+        "unstable": false
+      }
+    }
+  ],
+  "not_checked": [
+    {
+      "rule_id": "not-checked-1-2-1",
+      "title": "Audio-only and Video-only (Prerecorded)",
+      "wcag": [
+        "1.2.1"
+      ],
+      "status": "open",
+      "notes": "Media asset review required."
+    },
+    {
+      "rule_id": "not-checked-1-2-2",
+      "title": "Captions (Prerecorded)",
+      "wcag": [
+        "1.2.2"
+      ],
+      "status": "open",
+      "notes": "Media asset review required."
+    },
+    {
+      "rule_id": "not-checked-1-2-3",
+      "title": "Audio Description or Media Alternative (Prerecorded)",
+      "wcag": [
+        "1.2.3"
+      ],
+      "status": "open",
+      "notes": "Media asset review required."
+    },
+    {
+      "rule_id": "not-checked-1-2-4",
+      "title": "Captions (Live)",
+      "wcag": [
+        "1.2.4"
+      ],
+      "status": "open",
+      "notes": "Live media review required."
+    },
+    {
+      "rule_id": "not-checked-1-2-5",
+      "title": "Audio Description (Prerecorded)",
+      "wcag": [
+        "1.2.5"
+      ],
+      "status": "open",
+      "notes": "Media asset review required."
+    },
+    {
+      "rule_id": "not-checked-1-4-2",
+      "title": "Audio Control",
+      "wcag": [
+        "1.4.2"
+      ],
+      "status": "open",
+      "notes": "Static autoplay checks are partial and do not verify controls."
+    },
+    {
+      "rule_id": "not-checked-2-2-1",
+      "title": "Timing Adjustable",
+      "wcag": [
+        "2.2.1"
+      ],
+      "status": "open",
+      "notes": "Flow and session review required."
+    },
+    {
+      "rule_id": "not-checked-2-2-2",
+      "title": "Pause, Stop, Hide",
+      "wcag": [
+        "2.2.2"
+      ],
+      "status": "open",
+      "notes": "Flow and motion review required."
+    },
+    {
+      "rule_id": "not-checked-2-3-1",
+      "title": "Three Flashes or Below Threshold",
+      "wcag": [
+        "2.3.1"
+      ],
+      "status": "open",
+      "notes": "Visual review required."
+    }
+  ]
+}

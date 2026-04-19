@@ -1,0 +1,23 @@
+{
+  "target": "fixtures/baseline-unstable-fallback",
+  "framework": "html",
+  "files_scanned": 1,
+  "issue_count": 1,
+  "issues": [
+    {
+      "rule_id": "clickable-div",
+      "wcag": "2.1.1",
+      "file": "fixtures/baseline-unstable-fallback/index.html",
+      "line": 5,
+      "col": 5,
+      "snippet": "<div onClick=\"save()\">Action</div>",
+      "message": "<div> with onClick is not keyboard-accessible. Use <button type=\"button\"> or <a href> instead.",
+      "framework": "html",
+      "triage_hint": "auto",
+      "fix_data": {
+        "element": "div",
+        "pattern": "div_to_button"
+      }
+    }
+  ]
+}

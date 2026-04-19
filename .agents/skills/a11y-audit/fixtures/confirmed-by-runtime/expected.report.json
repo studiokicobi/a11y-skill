@@ -1,5 +1,5 @@
 {
-  "schema_version": "2.2.0",
+  "schema_version": "2.3.0",
   "generated_at": "2026-01-02T03:04:05Z",
   "target": "fixtures/confirmed-by-runtime",
   "framework": "html",
@@ -46,9 +46,21 @@
       "2.3.1"
     ]
   },
+  "baseline_comparison": {
+    "baseline_present": false,
+    "baseline_generated_at": "",
+    "summary": {
+      "new": 0,
+      "unchanged": 0,
+      "fixed": 0,
+      "resolved": 0,
+      "stale": 0,
+      "waived": 0
+    }
+  },
   "findings": [
     {
-      "id": "e5493083a634",
+      "id": "bd0c925f1bba",
       "rule_id": "img-missing-alt",
       "title": "Image missing alt attribute",
       "wcag": [
@@ -56,7 +68,7 @@
       ],
       "severity": "serious",
       "scanner": "static",
-      "scanner_version": "2.2.0",
+      "scanner_version": "2.3.0",
       "detected_at": "2026-01-02T03:04:05Z",
       "triage_group": "needs_input",
       "fix_safety": "input-required",
@@ -86,12 +98,18 @@
         "diff": "",
         "notes": ""
       },
-      "fingerprint": "img-missing-alt|fixtures/confirmed-by-runtime/index.html|12|img:src:/logo.png",
+      "fingerprint": "img-missing-alt|fixtures/confirmed-by-runtime/index.html|line|line-12",
       "confirmed_by": [
         "runtime",
         "static"
       ],
-      "waiver": null
+      "waiver": null,
+      "fingerprint_data": {
+        "fingerprint_version": "1.0",
+        "anchor_source": "line",
+        "anchor_value": "line-12",
+        "unstable": true
+      }
     }
   ],
   "not_checked": [
