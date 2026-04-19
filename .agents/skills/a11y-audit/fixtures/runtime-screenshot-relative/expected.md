@@ -22,13 +22,13 @@ _None._
 
 These need a decision from you. The agent can draft each fix once you answer.
 
-### 1. [WCAG 1.4.3] — Color contrast failure (runtime)
+### 1. [WCAG 1.1.1] — Image missing alt attribute
 **Location**: `http://localhost:3000`
-**Issue**: Elements must meet minimum color contrast ratio thresholds
-**Decision needed**: Pick an accessible color that aligns with your brand — we'll suggest 2–3 options if you want.
+**Issue**: Images must have alternate text
+**Decision needed**: What does this image convey? (For decorative images, we'll use alt="".)
 **Current code**:
 ```
-<p class="muted-copy">Low contrast helper text</p>
+<img class="brand-logo" src="/logo.png">
 ```
 
 ---

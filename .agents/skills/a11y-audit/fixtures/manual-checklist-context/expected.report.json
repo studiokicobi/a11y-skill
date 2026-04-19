@@ -1,8 +1,8 @@
 {
   "schema_version": "2.2.0",
   "generated_at": "2026-01-02T03:04:05Z",
-  "target": "fixtures/not-checked-stable",
-  "framework": "html",
+  "target": "https://example.test/settings",
+  "framework": "stateful",
   "standard": "WCAG 2.2 Level AA",
   "summary": {
     "scanner_detected_issue_count": 0,

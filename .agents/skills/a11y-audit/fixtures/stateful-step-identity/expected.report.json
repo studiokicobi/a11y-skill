@@ -1,30 +1,30 @@
 {
   "schema_version": "2.2.0",
   "generated_at": "2026-01-02T03:04:05Z",
-  "target": "fixtures/confirmed-by-runtime",
-  "framework": "html",
+  "target": "https://example.test/settings",
+  "framework": "stateful",
   "standard": "WCAG 2.2 Level AA",
   "summary": {
-    "scanner_detected_issue_count": 1,
+    "scanner_detected_issue_count": 2,
     "auto_fixable_count": 0,
-    "needs_input_count": 1,
+    "needs_input_count": 2,
     "manual_review_count": 0,
     "waived_count": 0,
     "not_checked_count": 9,
     "by_scanner": {
-      "static": 1,
-      "runtime": 0,
-      "stateful": 0,
+      "static": 0,
+      "runtime": 1,
+      "stateful": 1,
       "manual-template": 0,
       "token": 0
     },
     "by_confidence": {
-      "high": 1,
+      "high": 2,
       "medium": 0,
       "low": 0
     },
     "status_counts": {
-      "open": 1,
+      "open": 2,
       "waived": 0,
       "fixed": 0,
       "resolved": 0,
@@ -48,14 +48,14 @@
   },
   "findings": [
     {
-      "id": "e5493083a634",
+      "id": "778948ed1464",
       "rule_id": "img-missing-alt",
       "title": "Image missing alt attribute",
       "wcag": [
         "1.1.1"
       ],
       "severity": "serious",
-      "scanner": "static",
+      "scanner": "runtime",
       "scanner_version": "2.2.0",
       "detected_at": "2026-01-02T03:04:05Z",
       "triage_group": "needs_input",
@@ -64,18 +64,18 @@
       "status": "open",
       "group_reason": "Finding requires human input, content intent, or scanner uncertainty before remediation.",
       "location": {
-        "file": "fixtures/confirmed-by-runtime/index.html",
-        "line": 12,
-        "column": 3,
-        "url": "",
-        "selector": "",
+        "file": "",
+        "line": 0,
+        "column": 0,
+        "url": "https://example.test/settings",
+        "selector": "main > img.hero",
         "journey_step_id": ""
       },
       "evidence": {
-        "snippet": "<img src=\"/logo.png\">",
-        "dom_snippet": "",
+        "snippet": "",
+        "dom_snippet": "<img class=\"hero\" src=\"hero.png\">",
         "screenshot": "",
-        "axe_help_url": ""
+        "axe_help_url": "https://dequeuniversity.com/rules/axe/4.9/image-alt"
       },
       "decision_required": {
         "question": "What does this image convey? (For decorative images, we'll use alt=\"\".)",
@@ -86,12 +86,58 @@
         "diff": "",
         "notes": ""
       },
-      "fingerprint": "img-missing-alt|fixtures/confirmed-by-runtime/index.html|12|img:src:/logo.png",
+      "fingerprint": "img-missing-alt|https://example.test/settings|main > img.hero",
       "confirmed_by": [
-        "runtime",
-        "static"
+        "runtime"
       ],
-      "waiver": null
+      "waiver": null,
+      "origin_rule_id": "image-alt"
+    },
+    {
+      "id": "8b1f264bdd05",
+      "rule_id": "img-missing-alt",
+      "title": "Image missing alt attribute",
+      "wcag": [
+        "1.1.1"
+      ],
+      "severity": "serious",
+      "scanner": "stateful",
+      "scanner_version": "2.2.0",
+      "detected_at": "2026-01-02T03:04:05Z",
+      "triage_group": "needs_input",
+      "fix_safety": "input-required",
+      "confidence": "high",
+      "status": "open",
+      "group_reason": "Finding requires human input, content intent, or scanner uncertainty before remediation.",
+      "location": {
+        "file": "",
+        "line": 0,
+        "column": 0,
+        "url": "https://example.test/settings",
+        "selector": "[role=\"dialog\"] img.dialog-image",
+        "journey_step_id": "open-modal"
+      },
+      "evidence": {
+        "snippet": "",
+        "dom_snippet": "<img class=\"dialog-image\" src=\"summary.png\">",
+        "screenshot": "screenshots/modal-flow-open-modal.png",
+        "axe_help_url": "https://dequeuniversity.com/rules/axe/4.9/image-alt"
+      },
+      "decision_required": {
+        "question": "What does this image convey? (For decorative images, we'll use alt=\"\".)",
+        "options": []
+      },
+      "proposed_fix": {
+        "kind": "none",
+        "diff": "",
+        "notes": ""
+      },
+      "fingerprint": "img-missing-alt|https://example.test/settings|[role=\"dialog\"] img.dialog-image|open-modal",
+      "confirmed_by": [
+        "stateful"
+      ],
+      "waiver": null,
+      "origin_rule_id": "image-alt"
     }
   ],
   "not_checked": [

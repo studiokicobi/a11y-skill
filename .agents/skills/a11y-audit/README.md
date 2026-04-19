@@ -8,6 +8,7 @@ Produces a **triaged report grouped by fix autonomy** — auto-fixable, needs yo
 
 - **Static analysis** of source files (Python, no dependencies): missing `alt`, `<div onClick>`, hardcoded low-contrast colors, missing labels, `outline: none` without replacement, redundant ARIA, positive `tabindex`, `aria-hidden` on focusable elements, and more.
 - **Runtime analysis** via Playwright + axe-core: computed color contrast, focus management as rendered, ARIA state after hydration, landmark regions, live regions, heading order, and axe incomplete results routed to manual/input review.
+- **Stateful journey analysis** via Playwright + axe-core checkpoints: post-interaction findings tagged with `journey_step_id`, focus transitions, step failures, and screenshots per audited state.
 - **WCAG 2.2** coverage including the new criteria: 2.4.11 Focus Appearance, 2.5.7 Dragging Movements, 2.5.8 Target Size, 3.3.7 Redundant Entry, 3.3.8 Accessible Authentication.
 
 Automated tools catch roughly 30–40% of accessibility issues. This skill is honest about that — the manual checklist covers what the scanners can't reach.
@@ -68,8 +69,11 @@ node scripts/a11y_runtime.js --url http://localhost:3000 --output /tmp/runtime.j
 # Runtime scan with per-page config, auth, viewport, and wait settings
 node scripts/a11y_runtime.js --config runtime.config.json --output /tmp/runtime.json
 
+# Stateful journey scan with checkpoint screenshots
+node scripts/a11y_stateful.js --config journey.config.json --output /tmp/stateful.json
+
 # Triage into markdown plus normalized JSON
-python3 scripts/triage.py --static /tmp/static.json --runtime /tmp/runtime.json --output report.md --json-output report.json
+python3 scripts/triage.py --static /tmp/static.json --runtime /tmp/runtime.json --stateful /tmp/stateful.json --output report.md --json-output report.json
 
 # Color contrast check
 python3 scripts/contrast_checker.py --fg "#999" --bg "#fff" --suggest
@@ -81,7 +85,7 @@ The output is markdown with three sections in this order:
 
 1. **Auto-fixable** — each issue has a ready diff. Reply "go" and the agent applies them.
 2. **Needs your input** — each issue has a specific decision prompt. The agent drafts the fix after you answer.
-3. **Manual checklist** — keyboard nav, screen reader, visual/motion, forms, cognitive. You must test these yourself.
+3. **Manual checklist** — capability-tagged assisted checks derived from the page and journey context. You must test these yourself.
 
 Plus a "Not checked" section listing WCAG criteria that no automated tool can evaluate, so you know the gaps.
 
@@ -124,6 +128,31 @@ pages:
     screenshot_dir: .artifacts/runtime
 ```
 
+## Journey config
+
+`a11y_stateful.js` accepts `--config` with JSON or YAML. The supported shape is documented in `references/journey_schema.md`.
+
+Minimal example:
+
+```yaml
+journeys:
+  - id: modal-open-close
+    start_url: /settings
+    steps:
+      - id: open-modal
+        action: click
+        selector: '[data-testid="open-settings-modal"]'
+        wait_for:
+          selector: '[role="dialog"]'
+        scan: true
+      - id: close-modal
+        action: press
+        key: Escape
+        wait_for:
+          hidden_selector: '[role="dialog"]'
+        scan: true
+```
+
 ## What this skill does NOT do
 
 - It's not a replacement for testing with real assistive technology.
@@ -139,12 +168,14 @@ a11y-audit/
 ├── scripts/
 │   ├── a11y_scan.py                      # Static scanner (stdlib only)
 │   ├── a11y_runtime.js                   # Runtime scanner (Playwright + axe-core)
+│   ├── a11y_stateful.js                  # Stateful journey scanner (Playwright + axe-core)
 │   ├── contrast_checker.py               # WCAG contrast math
 │   └── triage.py                         # Scanner output → triaged report
 ├── references/
 │   ├── triage-rules.md                   # Classification logic
 │   ├── wcag-22-criteria.md               # Coverage matrix
 │   ├── wcag_coverage.md                  # Deterministic not-checked source
+│   ├── journey_schema.md                 # Supported journey config shape
 │   ├── contrast-alternatives.md          # Curated color replacements
 │   ├── pitfalls.md                       # Anti-patterns to avoid
 │   ├── fix-patterns-react.md             # React / Next.js

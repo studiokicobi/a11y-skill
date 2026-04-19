@@ -38,42 +38,84 @@ _None._
 
 These require you to test with actual assistive technology or in the browser. Automated tools catch roughly a third of accessibility issues — the rest live here.
 
-### Keyboard navigation (WCAG 2.1.1, 2.4.3, 2.4.7, 2.4.11)
-- [ ] Tab through the full page — every interactive element is reachable
-- [ ] Tab order follows visual/reading order, no unexpected jumps
-- [ ] Every focused element has a clearly visible focus indicator (≥2px, ≥3:1 contrast)
-- [ ] Shift+Tab works in reverse and matches the forward order
-- [ ] No keyboard traps — you can always Tab out of any component
-- [ ] Escape closes modals, popovers, dropdowns, and autocompletes
-- [ ] Enter and Space activate buttons; Enter activates links
-- [ ] Within composite widgets (tabs, menus, listboxes), arrow keys move within and Tab moves out
-- [ ] Modals trap focus and return focus to the trigger element on close
+Assisted checks:
 
-### Screen reader (WCAG 1.3.1, 2.4.2, 2.4.6, 4.1.2, 4.1.3)
-- [ ] Page title describes the current page uniquely
-- [ ] Heading structure creates a logical outline when navigating by headings
-- [ ] All form inputs announce label, required state, and any error
-- [ ] Dynamic content changes (toasts, errors, loaded results) are announced
-- [ ] Custom widgets announce role and state (expanded/collapsed, selected)
-- [ ] Route changes in SPAs are announced
-- [ ] Icon buttons announce their purpose, not the icon name
+### 1. Keyboard tab order through the audited page or flow
+**Capability**: `keyboard`
+**WCAG**: 2.1.1, 2.4.3
+**Context**: Use the current page-load state and every audited interaction state.
+**How to test**:
+- [ ] Press Tab from the browser chrome into the page and keep tabbing until focus returns to the browser or the end of the flow.
+- [ ] Repeat with Shift+Tab to verify the reverse order.
+**Expected result**:
+- [ ] Every interactive element is reachable in a logical visual order.
+- [ ] No keyboard trap appears and focus never jumps to hidden or inert UI.
 
-### Visual and motion (WCAG 1.4.1, 1.4.10, 1.4.11, 1.4.12, 2.3.*)
-- [ ] Page usable at 200% zoom with no horizontal scroll at 1280px viewport
-- [ ] Page reflows at 320px width without loss of content
-- [ ] Text spacing can be overridden without clipping (line-height 1.5, paragraph 2×, letter 0.12em)
-- [ ] No information conveyed by color alone (check with a grayscale filter)
-- [ ] UI component borders/states meet 3:1 contrast against adjacent colors
-- [ ] Animations respect `prefers-reduced-motion`
-- [ ] No content flashes more than 3× per second
+### 2. Focus visibility and focus return behavior
+**Capability**: `visual`
+**WCAG**: 2.4.7, 2.4.11
+**Context**: Check each interactive state reached during the audit.
+**How to test**:
+- [ ] Tab to each control, including links, buttons, fields, and custom widgets.
+- [ ] Trigger any overlays, menus, or popovers that appear in the audited flow and then close them.
+**Expected result**:
+- [ ] The active element has a visible focus indicator with sufficient contrast.
+- [ ] When transient UI closes, focus returns to a sensible trigger or next logical control.
 
-### Forms (WCAG 3.3.1–3.3.8)
-- [ ] Errors identify the problem in text (not just color/icon)
-- [ ] Required fields indicated in the label (not just with a red asterisk)
-- [ ] Input type matches content (email, tel, etc.)
-- [ ] Password fields allow paste
-- [ ] CAPTCHA has a non-cognitive alternative (WCAG 2.2 — 3.3.8)
-- [ ] Multi-step flows don't ask for re-entry of earlier data (WCAG 2.2 — 3.3.7)
+### 3. Heading outline and page title announcement
+**Capability**: `screen reader`
+**WCAG**: 1.3.1, 2.4.2, 2.4.6
+**Context**: Inspect the current page and any post-interaction destination states.
+**How to test**:
+- [ ] Open the page or flow with a screen reader rotor/list-of-headings view.
+- [ ] Move by heading level and confirm the document title after each destination change.
+**Expected result**:
+- [ ] The title uniquely identifies the current page or state.
+- [ ] Heading levels form a logical outline without skipped or decorative headings being announced as structure.
+
+### 4. Zoom, reflow, and text spacing resilience
+**Capability**: `browser`
+**WCAG**: 1.4.10, 1.4.12
+**Context**: Run this on the main page and any key post-interaction view.
+**How to test**:
+- [ ] Check the page at 200% zoom and then at 320px CSS width.
+- [ ] Override text spacing to line-height 1.5, paragraph spacing 2x, letter spacing 0.12em, and word spacing 0.16em.
+**Expected result**:
+- [ ] Content remains usable without horizontal scrolling for main reading content.
+- [ ] No clipping, overlap, or lost controls appear when text spacing is increased.
+
+### 5. Reduced motion and motion-triggered interactions
+**Capability**: `visual`
+**WCAG**: 2.3.*
+**Context**: Repeat the audited journey with reduced motion enabled if the UI animates.
+**How to test**:
+- [ ] Turn on the OS or browser reduced-motion preference and replay the audited flow.
+- [ ] Trigger any animated transitions, expanding sections, or route changes observed during the scan.
+**Expected result**:
+- [ ] Non-essential motion is reduced or removed.
+- [ ] Animations do not block task completion or hide focus movement.
+
+### 6. Use-of-color-only communication
+**Capability**: `visual`
+**WCAG**: 1.4.1
+**Context**: Check interactive controls, validation states, charts, and inline status messages.
+**How to test**:
+- [ ] Review the page in grayscale or with color filters disabled.
+- [ ] Inspect success, error, selected, and required states across the audited flow.
+**Expected result**:
+- [ ] Meaning is still clear without color perception.
+- [ ] Status and selection are conveyed with text, iconography, or structural cues in addition to color.
+
+### 7. Form labels, errors, and required-state announcements
+**Capability**: `screen reader`
+**WCAG**: 3.3.1, 3.3.2, 4.1.2, 4.1.3
+**Context**: Use the form states reached in the audited flow, including invalid submissions.
+**How to test**:
+- [ ] Move through each field with a screen reader and listen for label, role, value, and required state.
+- [ ] Submit the form with missing or invalid data and listen for the first announced error.
+**Expected result**:
+- [ ] Every field announces a clear programmatic label and required status.
+- [ ] Errors are announced in text, associated to the affected field, and do not rely on color alone.
 
 ---
 

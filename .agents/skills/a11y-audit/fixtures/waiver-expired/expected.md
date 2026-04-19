@@ -1,35 +1,35 @@
 # Accessibility Audit Report
 
-**Target**: http://localhost:3000
-**Framework**: unknown
+**Target**: fixtures/waiver-expired
+**Framework**: html
 **Standard**: WCAG 2.2 Level AA
 **Date**: <DATE>
 
 ## Summary
-Found 1 scanner-detected issues: **0 auto-fixable**, **1 need your input**, plus a manual checklist below. (0 scanner-flagged items require manual review.)
-By source: runtime 1.
+Found 1 scanner-detected issues: **1 auto-fixable**, **0 need your input**, plus a manual checklist below. (0 scanner-flagged items require manual review.)
+By source: static 1.
 By confidence: high 1.
 
 ---
 
-## Group 1: Auto-fixable (0 issues)
+## Group 1: Auto-fixable (1 issues)
 
-_None._
+The agent can apply these fixes without further input. Reply **"go"** to proceed, or list which to skip.
+
+### 1. [WCAG best-practice] — target="_blank" without rel="noopener"
+**Location**: `fixtures/waiver-expired/index.html:9`
+**Issue**: target="_blank" without rel="noopener noreferrer". Security and sometimes accessibility issue.
+**Fix**:
+```diff
+- <a href="https://example.com" target="_blank" rel="external">Docs</a>
++ <a href="https://example.com" target="_blank" rel="external noopener noreferrer">Docs</a>
+```
 
 ---
 
-## Group 2: Needs your input (1 issues)
+## Group 2: Needs your input (0 issues)
 
-These need a decision from you. The agent can draft each fix once you answer.
-
-### 1. [WCAG 1.4.3] — Color contrast failure (runtime)
-**Location**: `http://localhost:3000`
-**Issue**: Elements must meet minimum color contrast ratio thresholds
-**Decision needed**: Pick an accessible color that aligns with your brand — we'll suggest 2–3 options if you want.
-**Current code**:
-```
-<p class="muted-copy">Low contrast helper text</p>
-```
+_None._
 
 ---
 

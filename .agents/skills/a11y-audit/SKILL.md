@@ -15,7 +15,7 @@ This skill produces three groups in that order:
 
 1. **Auto-fixable** — the agent can patch the code. Lists each issue with the exact edit. User approves, agent proceeds.
 2. **Needs human input** — the agent drafts, the user decides. Lists each issue with a proposed fix and the decision needed.
-3. **Manual checklist** — the user must do this themselves, with assistive tech. Lists checks grouped by WCAG criterion.
+3. **Manual checklist** — the user must do this themselves, with assistive tech. Lists capability-tagged assisted checks derived from the page and journey context.
 
 ## When to use this skill
 
@@ -58,7 +58,13 @@ node scripts/a11y_runtime.js --config runtime.config.json --output /tmp/a11y-run
 ```
 The runtime config supports storage-state auth, headers/cookies auth, per-page wait conditions, route blocking, viewport, reduced motion, and optional screenshots.
 
-**If the user gives a URL, run both.** Static tells you where to fix in the source; runtime confirms what the real DOM produces. If the user only gives a directory, run static only and note in the report that runtime checks weren't performed.
+**Stateful journey scan** (when the page requires interactions):
+```bash
+node scripts/a11y_stateful.js --config journey.config.json --output /tmp/a11y-stateful.json
+```
+Uses Playwright + axe-core checkpoint scans after scripted actions. Emits stateful findings with `journey_step_id`, plus focus transitions, step failures, and checkpoint screenshots. The supported config shape lives in `references/journey_schema.md`.
+
+**If the user gives a URL, run static plus runtime.** Add the stateful runner when the page depends on modals, route transitions, validation states, or other interaction-driven UI. Static tells you where to fix in the source; runtime confirms what the real DOM produces on page load; stateful confirms what appears after the user actually interacts. If the user only gives a directory, run static only and note in the report that runtime/stateful checks weren't performed.
 
 **If the user gives a production URL but no source**, runtime only. Fixes will be framework-agnostic HTML/CSS suggestions.
 
@@ -66,7 +72,7 @@ The runtime config supports storage-state auth, headers/cookies auth, per-page w
 
 Run the triage script to produce the three-group report:
 ```bash
-python3 scripts/triage.py --static /tmp/a11y-static.json --runtime /tmp/a11y-runtime.json --output /tmp/a11y-report.md
+python3 scripts/triage.py --static /tmp/a11y-static.json --runtime /tmp/a11y-runtime.json --stateful /tmp/a11y-stateful.json --output /tmp/a11y-report.md
 ```
 
 The script applies the triage rules in `references/triage-rules.md`. Read that file before making triage decisions manually — do not classify issues from memory.
@@ -120,6 +126,8 @@ The skill honestly splits coverage into three tiers. Don't claim more than this.
 - best-practice — `target="_blank"` without `rel="noopener noreferrer"`
 
 **Runtime scanner (axe-core via `a11y_runtime.js`):** runs the full axe-core rule set tagged `wcag2a`, `wcag2aa`, `wcag21a`, `wcag21aa`, `wcag22a`, `wcag22aa`, and `best-practice`. This includes computed color contrast, focus management, ARIA state after hydration, landmark regions, heading order, live regions, target size (WCAG 2.2 — 2.5.8), and many more. Axe-incomplete results (checks axe couldn't fully verify) are routed to Group 2 for manual confirmation.
+
+**Stateful scanner (`a11y_stateful.js`):** runs Playwright journeys described in `references/journey_schema.md`, executes `click`, `press`, `fill`, `select`, `navigate`, and `assert` steps, and performs checkpoint axe scans after selected steps. Findings preserve `journey_step_id`, and the raw output records focus transitions, step failures, and checkpoint screenshots.
 
 **Manual checklist (neither scanner can automate):** keyboard navigation (full tab walkthrough), screen reader testing, visual reflow, motion sensitivity, cognitive accessibility, and the WCAG 2.2 criteria that require flow review (2.5.7 Dragging, 3.3.7 Redundant Entry, 3.3.8 Accessible Authentication). See `references/triage-rules.md` for the full checklist.
 
@@ -196,17 +204,14 @@ These need a decision from you. The agent can draft each fix once you answer.
 
 These require you to test with actual assistive technology or in the browser.
 
-### Keyboard navigation
-- [ ] <item>
-
-### Screen reader
-- [ ] <item>
-
-### Visual / motion
-- [ ] <item>
-
-### Forms
-- [ ] <item>
+### 1. <assisted check title>
+**Capability**: `keyboard|screen reader|visual|browser`
+**WCAG**: <criteria>
+**Context**: <page or step context>
+**How to test**:
+- [ ] <step>
+**Expected result**:
+- [ ] <outcome>
 
 ---
 

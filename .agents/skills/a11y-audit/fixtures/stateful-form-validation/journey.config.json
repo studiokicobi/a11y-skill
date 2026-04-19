@@ -1,0 +1,25 @@
+{
+  "journeys": [
+    {
+      "id": "form-validation",
+      "start_url": "index.html",
+      "steps": [
+        {
+          "id": "fill-email",
+          "action": "fill",
+          "selector": "#email",
+          "value": ""
+        },
+        {
+          "id": "submit-invalid",
+          "action": "click",
+          "selector": "#submit-button",
+          "wait_for": {
+            "selector": "#email-error"
+          },
+          "scan": true
+        }
+      ]
+    }
+  ]
+}

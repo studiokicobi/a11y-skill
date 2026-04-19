@@ -1,14 +1,13 @@
 # Accessibility Audit Report
 
-**Target**: http://localhost:3000
-**Framework**: unknown
+**Target**: fixtures/status-history
+**Framework**: html
 **Standard**: WCAG 2.2 Level AA
 **Date**: <DATE>
 
 ## Summary
-Found 1 scanner-detected issues: **0 auto-fixable**, **1 need your input**, plus a manual checklist below. (0 scanner-flagged items require manual review.)
-By source: runtime 1.
-By confidence: high 1.
+Found 0 scanner-detected issues: **0 auto-fixable**, **0 need your input**, plus a manual checklist below. (0 scanner-flagged items require manual review.)
+Tracked statuses: fixed 1, resolved 1, stale 1.
 
 ---
 
@@ -18,18 +17,9 @@ _None._
 
 ---
 
-## Group 2: Needs your input (1 issues)
+## Group 2: Needs your input (0 issues)
 
-These need a decision from you. The agent can draft each fix once you answer.
-
-### 1. [WCAG 1.4.3] — Color contrast failure (runtime)
-**Location**: `http://localhost:3000`
-**Issue**: Elements must meet minimum color contrast ratio thresholds
-**Decision needed**: Pick an accessible color that aligns with your brand — we'll suggest 2–3 options if you want.
-**Current code**:
-```
-<p class="muted-copy">Low contrast helper text</p>
-```
+_None._
 
 ---
 
@@ -104,6 +94,27 @@ Assisted checks:
 **Expected result**:
 - [ ] Meaning is still clear without color perception.
 - [ ] Status and selection are conveyed with text, iconography, or structural cues in addition to color.
+
+---
+
+## Historical statuses (3)
+
+These findings were carried from status records and are kept for tracking, not active remediation:
+
+### 1. [WCAG best-practice] — target="_blank" without rel="noopener"
+**Location**: `fixtures/status-history/index.html:9`
+**Status**: fixed
+**Reason**: Finding status is fixed; it is tracked for reporting but not surfaced in active remediation groups.
+
+### 2. [WCAG 2.4.6] — Heading order skip
+**Location**: `http://localhost:3000/settings`
+**Status**: resolved
+**Reason**: Finding status is resolved; it is tracked for reporting but not surfaced in active remediation groups.
+
+### 3. [WCAG 3.3.2] — Input missing label
+**Location**: `fixtures/status-history/form.html:18`
+**Status**: stale
+**Reason**: Finding status is stale; it is tracked for reporting but not surfaced in active remediation groups.
 
 ---
 

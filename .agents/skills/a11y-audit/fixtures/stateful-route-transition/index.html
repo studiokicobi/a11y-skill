@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Home</title>
+  <style>
+    body { font-family: sans-serif; margin: 2rem; }
+    section:focus { outline: 2px solid #0a66c2; outline-offset: 4px; }
+  </style>
+</head>
+<body>
+  <nav>
+    <button id="go-dashboard" type="button">Go to dashboard</button>
+  </nav>
+  <main id="app"></main>
+
+  <script>
+    const app = document.getElementById('app');
+    const button = document.getElementById('go-dashboard');
+
+    function render() {
+      if (window.location.hash === '#dashboard') {
+        document.title = 'Dashboard';
+        app.innerHTML = `
+          <section id="dashboard-view" tabindex="-1" aria-label="Dashboard content">
+            <h3>Dashboard</h3>
+            <p>Recent activity appears here.</p>
+          </section>
+        `;
+        document.getElementById('dashboard-view').focus();
+        return;
+      }
+
+      document.title = 'Home';
+      app.innerHTML = `
+        <section id="home-view">
+          <h1>Home</h1>
+          <p>Overview content.</p>
+        </section>
+      `;
+    }
+
+    button.addEventListener('click', () => {
+      window.location.hash = '#dashboard';
+      render();
+    });
+
+    window.addEventListener('hashchange', render);
+    render();
+  </script>
+</body>
+</html>

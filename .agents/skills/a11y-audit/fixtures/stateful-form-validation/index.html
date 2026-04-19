@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Stateful Form Validation Fixture</title>
+  <style>
+    body { font-family: sans-serif; margin: 2rem; }
+    .error {
+      color: #aaaaaa;
+      margin-top: 0.5rem;
+    }
+    [hidden] { display: none; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Create account</h1>
+    <form id="signup-form" novalidate>
+      <label for="email">Email</label>
+      <input id="email" name="email" type="email" aria-describedby="email-error">
+      <p id="email-error" class="error" aria-live="polite" hidden>Email is required.</p>
+      <button id="submit-button" type="submit">Continue</button>
+    </form>
+  </main>
+
+  <script>
+    const form = document.getElementById('signup-form');
+    const email = document.getElementById('email');
+    const error = document.getElementById('email-error');
+
+    form.addEventListener('submit', (event) => {
+      event.preventDefault();
+      const invalid = !email.value.trim();
+      error.hidden = !invalid;
+      email.setAttribute('aria-invalid', invalid ? 'true' : 'false');
+      if (invalid) {
+        email.focus();
+      }
+    });
+  </script>
+</body>
+</html>

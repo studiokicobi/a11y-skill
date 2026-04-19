@@ -1,14 +1,12 @@
 # Accessibility Audit Report
 
-**Target**: http://localhost:3000
-**Framework**: unknown
+**Target**: fixtures/not-checked-stable
+**Framework**: html
 **Standard**: WCAG 2.2 Level AA
 **Date**: <DATE>
 
 ## Summary
-Found 1 scanner-detected issues: **0 auto-fixable**, **1 need your input**, plus a manual checklist below. (0 scanner-flagged items require manual review.)
-By source: runtime 1.
-By confidence: high 1.
+Found 0 scanner-detected issues: **0 auto-fixable**, **0 need your input**, plus a manual checklist below. (0 scanner-flagged items require manual review.)
 
 ---
 
@@ -18,18 +16,9 @@ _None._
 
 ---
 
-## Group 2: Needs your input (1 issues)
+## Group 2: Needs your input (0 issues)
 
-These need a decision from you. The agent can draft each fix once you answer.
-
-### 1. [WCAG 1.4.3] — Color contrast failure (runtime)
-**Location**: `http://localhost:3000`
-**Issue**: Elements must meet minimum color contrast ratio thresholds
-**Decision needed**: Pick an accessible color that aligns with your brand — we'll suggest 2–3 options if you want.
-**Current code**:
-```
-<p class="muted-copy">Low contrast helper text</p>
-```
+_None._
 
 ---
 

@@ -27,7 +27,8 @@ Treat `a11y-audit.skill` as a distributable artifact, not the file to edit direc
 - Run fixture runner from repo root: `python3 .agents/skills/a11y-audit/fixtures/run_fixtures.py`
 - Run a static scanner smoke test: `python3 .agents/skills/a11y-audit/scripts/a11y_scan.py .agents/skills/a11y-audit/fixtures/html-basic --quiet --output /tmp/a11y-static.json`
 - Run a runtime script syntax check: `node --check .agents/skills/a11y-audit/scripts/a11y_runtime.js`
-- Run the live Playwright smoke fixture when browser launch is available: `python3 .agents/skills/a11y-audit/fixtures/run_fixtures.py --only runtime-playwright-basic`
+- Run a stateful script syntax check: `node --check .agents/skills/a11y-audit/scripts/a11y_stateful.js`
+- Run the browser-backed fixture suite when browser launch is available: `python3 .agents/skills/a11y-audit/fixtures/run_fixtures.py --live-runtime`
 - There is no configured repo-level `pytest` or `ruff` workflow yet.
 
 ## Reporting expectations

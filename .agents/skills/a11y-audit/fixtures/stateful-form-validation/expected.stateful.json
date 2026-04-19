@@ -1,0 +1,48 @@
+{
+  "scanner": "stateful",
+  "engine": "playwright",
+  "browser": "chromium",
+  "issue_count": 1,
+  "checkpoint_count": 1,
+  "step_failure_count": 0,
+  "issues": [
+    {
+      "rule_id": "color-contrast",
+      "origin_rule_id": "color-contrast",
+      "wcag": "1.4.3",
+      "file": "file://fixtures/stateful-form-validation/index.html",
+      "journey_step_id": "submit-invalid",
+      "triage_hint": "input",
+      "result_type": "violation",
+      "target": "#email-error",
+      "screenshot": "stateful-screenshots/form-validation-submit-invalid-01.png"
+    }
+  ],
+  "checkpoints": [
+    {
+      "journey_id": "form-validation",
+      "journey_step_id": "submit-invalid",
+      "url": "file://fixtures/stateful-form-validation/index.html",
+      "issue_count": 1,
+      "screenshot": "stateful-screenshots/form-validation-submit-invalid-01.png"
+    }
+  ],
+  "focus_transitions": [
+    {
+      "journey_step_id": "fill-email",
+      "action": "fill",
+      "before_url": "file://fixtures/stateful-form-validation/index.html",
+      "url": "file://fixtures/stateful-form-validation/index.html",
+      "before": "body",
+      "after": "input#email[name=\"email\"]"
+    },
+    {
+      "journey_step_id": "submit-invalid",
+      "action": "click",
+      "before_url": "file://fixtures/stateful-form-validation/index.html",
+      "url": "file://fixtures/stateful-form-validation/index.html",
+      "before": "input#email[name=\"email\"]",
+      "after": "input#email[name=\"email\"]"
+    }
+  ]
+}

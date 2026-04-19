@@ -1,0 +1,67 @@
+{
+  "scanner": "stateful",
+  "journeys": [
+    {
+      "id": "modal-flow",
+      "start_url": "https://example.test/settings",
+      "step_count": 1,
+      "checkpoint_count": 1
+    }
+  ],
+  "checkpoints": [
+    {
+      "journey_id": "modal-flow",
+      "journey_step_id": "open-modal",
+      "checkpoint_id": "modal-flow/open-modal",
+      "url": "https://example.test/settings",
+      "screenshot": "screenshots/modal-flow-open-modal.png",
+      "counts": {
+        "issues": 1,
+        "violations": 1,
+        "incomplete": 0,
+        "passes": 0
+      }
+    }
+  ],
+  "focus_transitions": [
+    {
+      "journey_id": "modal-flow",
+      "journey_step_id": "open-modal",
+      "action": "click",
+      "before_url": "https://example.test/settings",
+      "url": "https://example.test/settings",
+      "before": "button#open-modal",
+      "after": "button#close-modal"
+    }
+  ],
+  "step_failures": [],
+  "issues": [
+    {
+      "scanner": "stateful",
+      "rule_id": "img-missing-alt",
+      "origin_rule_id": "image-alt",
+      "wcag": "1.1.1",
+      "file": "https://example.test/settings",
+      "line": 0,
+      "col": 0,
+      "snippet": "<img class=\"dialog-image\" src=\"summary.png\">",
+      "message": "Images must have alternate text",
+      "framework": "stateful",
+      "triage_hint": "input",
+      "journey_step_id": "open-modal",
+      "fix_data": {
+        "axe_rule": "image-alt",
+        "impact": "serious",
+        "target": "[role=\"dialog\"] img.dialog-image",
+        "help_url": "https://dequeuniversity.com/rules/axe/4.9/image-alt",
+        "failure_summary": "",
+        "result_type": "violation",
+        "journey_id": "modal-flow",
+        "journey_step_id": "open-modal",
+        "checkpoint_id": "modal-flow/open-modal",
+        "screenshot": "screenshots/modal-flow-open-modal.png"
+      }
+    }
+  ],
+  "passes": []
+}

@@ -1,0 +1,55 @@
+{
+  "scanner": "stateful",
+  "engine": "playwright",
+  "browser": "chromium",
+  "issue_count": 1,
+  "checkpoint_count": 2,
+  "step_failure_count": 0,
+  "issues": [
+    {
+      "rule_id": "img-missing-alt",
+      "origin_rule_id": "image-alt",
+      "wcag": "1.1.1",
+      "file": "file://fixtures/stateful-modal/index.html",
+      "journey_step_id": "open-modal",
+      "triage_hint": "input",
+      "result_type": "violation",
+      "target": "img",
+      "screenshot": "stateful-screenshots/modal-flow-open-modal-01.png"
+    }
+  ],
+  "checkpoints": [
+    {
+      "journey_id": "modal-flow",
+      "journey_step_id": "close-modal",
+      "url": "file://fixtures/stateful-modal/index.html",
+      "issue_count": 0,
+      "screenshot": "stateful-screenshots/modal-flow-close-modal-02.png"
+    },
+    {
+      "journey_id": "modal-flow",
+      "journey_step_id": "open-modal",
+      "url": "file://fixtures/stateful-modal/index.html",
+      "issue_count": 1,
+      "screenshot": "stateful-screenshots/modal-flow-open-modal-01.png"
+    }
+  ],
+  "focus_transitions": [
+    {
+      "journey_step_id": "close-modal",
+      "action": "press",
+      "before_url": "file://fixtures/stateful-modal/index.html",
+      "url": "file://fixtures/stateful-modal/index.html",
+      "before": "button#close-modal",
+      "after": "button#open-modal"
+    },
+    {
+      "journey_step_id": "open-modal",
+      "action": "click",
+      "before_url": "file://fixtures/stateful-modal/index.html",
+      "url": "file://fixtures/stateful-modal/index.html",
+      "before": "body",
+      "after": "button#close-modal"
+    }
+  ]
+}

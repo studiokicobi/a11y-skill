@@ -1,0 +1,40 @@
+{
+  "scanner": "stateful",
+  "engine": "playwright",
+  "browser": "chromium",
+  "issue_count": 1,
+  "checkpoint_count": 1,
+  "step_failure_count": 0,
+  "issues": [
+    {
+      "rule_id": "page-has-heading-one",
+      "origin_rule_id": "page-has-heading-one",
+      "wcag": "",
+      "file": "file://fixtures/stateful-route-transition/index.html#dashboard",
+      "journey_step_id": "go-dashboard",
+      "triage_hint": "manual",
+      "result_type": "violation",
+      "target": "html",
+      "screenshot": "stateful-screenshots/route-transition-go-dashboard-01.png"
+    }
+  ],
+  "checkpoints": [
+    {
+      "journey_id": "route-transition",
+      "journey_step_id": "go-dashboard",
+      "url": "file://fixtures/stateful-route-transition/index.html#dashboard",
+      "issue_count": 1,
+      "screenshot": "stateful-screenshots/route-transition-go-dashboard-01.png"
+    }
+  ],
+  "focus_transitions": [
+    {
+      "journey_step_id": "go-dashboard",
+      "action": "click",
+      "before_url": "file://fixtures/stateful-route-transition/index.html",
+      "url": "file://fixtures/stateful-route-transition/index.html#dashboard",
+      "before": "body",
+      "after": "section#dashboard-view[aria-label=\"Dashboard content\"]"
+    }
+  ]
+}

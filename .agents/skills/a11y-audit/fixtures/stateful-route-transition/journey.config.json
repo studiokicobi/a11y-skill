@@ -1,0 +1,19 @@
+{
+  "journeys": [
+    {
+      "id": "route-transition",
+      "start_url": "index.html",
+      "steps": [
+        {
+          "id": "go-dashboard",
+          "action": "click",
+          "selector": "#go-dashboard",
+          "wait_for": {
+            "selector": "#dashboard-view"
+          },
+          "scan": true
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,28 @@
+{
+  "journeys": [
+    {
+      "id": "modal-flow",
+      "start_url": "index.html",
+      "steps": [
+        {
+          "id": "open-modal",
+          "action": "click",
+          "selector": "#open-modal",
+          "wait_for": {
+            "selector": "#dialog"
+          },
+          "scan": true
+        },
+        {
+          "id": "close-modal",
+          "action": "press",
+          "key": "Escape",
+          "wait_for": {
+            "hidden_selector": "#dialog"
+          },
+          "scan": true
+        }
+      ]
+    }
+  ]
+}

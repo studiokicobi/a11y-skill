@@ -1,0 +1,88 @@
+{
+  "scanner": "stateful",
+  "journeys": [
+    {
+      "id": "account-flow",
+      "start_url": "https://example.test/settings",
+      "step_count": 4,
+      "checkpoint_count": 2
+    }
+  ],
+  "checkpoints": [
+    {
+      "journey_id": "account-flow",
+      "journey_step_id": "open-modal",
+      "checkpoint_id": "account-flow/open-modal",
+      "url": "https://example.test/settings",
+      "screenshot": "screenshots/account-flow-open-modal.png",
+      "counts": {
+        "issues": 0,
+        "violations": 0,
+        "incomplete": 0,
+        "passes": 0
+      }
+    },
+    {
+      "journey_id": "account-flow",
+      "journey_step_id": "go-dashboard",
+      "checkpoint_id": "account-flow/go-dashboard",
+      "url": "https://example.test/settings#dashboard",
+      "screenshot": "screenshots/account-flow-go-dashboard.png",
+      "counts": {
+        "issues": 0,
+        "violations": 0,
+        "incomplete": 0,
+        "passes": 0
+      }
+    }
+  ],
+  "focus_transitions": [
+    {
+      "journey_id": "account-flow",
+      "journey_step_id": "open-modal",
+      "action": "click",
+      "before_url": "https://example.test/settings",
+      "url": "https://example.test/settings",
+      "before": "button#launch-settings",
+      "after": "button#close-modal"
+    },
+    {
+      "journey_id": "account-flow",
+      "journey_step_id": "fill-email",
+      "action": "fill",
+      "before_url": "https://example.test/settings",
+      "url": "https://example.test/settings",
+      "before": "input#email",
+      "after": "input#email"
+    },
+    {
+      "journey_id": "account-flow",
+      "journey_step_id": "submit-invalid",
+      "action": "click",
+      "before_url": "https://example.test/settings",
+      "url": "https://example.test/settings",
+      "before": "input#email",
+      "after": "input#email"
+    },
+    {
+      "journey_id": "account-flow",
+      "journey_step_id": "go-dashboard",
+      "action": "navigate",
+      "before_url": "https://example.test/settings",
+      "url": "https://example.test/settings#dashboard",
+      "before": "button#go-dashboard",
+      "after": "main#dashboard-view"
+    }
+  ],
+  "step_failures": [
+    {
+      "journey_id": "account-flow",
+      "journey_step_id": "submit-invalid",
+      "action": "click",
+      "url": "https://example.test/settings",
+      "message": "Example failure note for manual follow-up."
+    }
+  ],
+  "issues": [],
+  "passes": []
+}

@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Stateful Modal Fixture</title>
+  <style>
+    [hidden] { display: none !important; }
+    body { font-family: sans-serif; margin: 2rem; }
+    .dialog-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.5);
+      display: grid;
+      place-items: center;
+    }
+    .dialog-panel {
+      background: #fff;
+      padding: 1.5rem;
+      width: 24rem;
+      border-radius: 0.5rem;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Preferences</h1>
+    <button id="open-modal" type="button">Open settings modal</button>
+  </main>
+
+  <div id="dialog" class="dialog-backdrop" role="dialog" aria-modal="true" aria-labelledby="dialog-title" hidden>
+    <div class="dialog-panel">
+      <h2 id="dialog-title">Settings</h2>
+      <p>Review the current preference summary.</p>
+      <img src="decorative.png">
+      <button id="close-modal" type="button">Close</button>
+    </div>
+  </div>
+
+  <script>
+    const openButton = document.getElementById('open-modal');
+    const closeButton = document.getElementById('close-modal');
+    const dialog = document.getElementById('dialog');
+
+    function openDialog() {
+      dialog.hidden = false;
+      closeButton.focus();
+    }
+
+    function closeDialog() {
+      dialog.hidden = true;
+      openButton.focus();
+    }
+
+    openButton.addEventListener('click', openDialog);
+    closeButton.addEventListener('click', closeDialog);
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && !dialog.hidden) {
+        closeDialog();
+      }
+    });
+  </script>
+</body>
+</html>

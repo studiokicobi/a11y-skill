@@ -8,7 +8,7 @@
 ## Summary
 Found 1 scanner-detected issues: **0 auto-fixable**, **1 need your input**, plus a manual checklist below. (0 scanner-flagged items require manual review.)
 By source: runtime 1.
-By confidence: high 1.
+By confidence: low 1.
 
 ---
 
@@ -22,13 +22,13 @@ _None._
 
 These need a decision from you. The agent can draft each fix once you answer.
 
-### 1. [WCAG 1.4.3] — Color contrast failure (runtime)
+### 1. [WCAG 4.1.2] — Aria valid attr value
 **Location**: `http://localhost:3000`
-**Issue**: Elements must meet minimum color contrast ratio thresholds
-**Decision needed**: Pick an accessible color that aligns with your brand — we'll suggest 2–3 options if you want.
+**Issue**: ARIA attribute values must be valid (needs manual verification)
+**Decision needed**: Review and confirm the proposed fix below.
 **Current code**:
 ```
-<p class="muted-copy">Low contrast helper text</p>
+<button aria-pressed="maybe">Open</button>
 ```
 
 ---

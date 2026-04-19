@@ -24,7 +24,7 @@ from pathlib import Path
 from typing import Dict, Iterable, List, Optional
 
 
-SCANNER_VERSION = "2.1.1"
+SCANNER_VERSION = "2.2.0"
 STANDARD = "WCAG 2.2 Level AA"
 DEFAULT_CONFIDENCE = "medium"
 REPORT_GROUPS = ("autofix", "needs_input", "manual_review", "not_checked")
@@ -98,46 +98,6 @@ RULE_TO_CONFIDENCE = {
     "color-contrast": "high",
     "heading-order": "medium",
 }
-
-
-MANUAL_CHECKLIST = """
-### Keyboard navigation (WCAG 2.1.1, 2.4.3, 2.4.7, 2.4.11)
-- [ ] Tab through the full page — every interactive element is reachable
-- [ ] Tab order follows visual/reading order, no unexpected jumps
-- [ ] Every focused element has a clearly visible focus indicator (≥2px, ≥3:1 contrast)
-- [ ] Shift+Tab works in reverse and matches the forward order
-- [ ] No keyboard traps — you can always Tab out of any component
-- [ ] Escape closes modals, popovers, dropdowns, and autocompletes
-- [ ] Enter and Space activate buttons; Enter activates links
-- [ ] Within composite widgets (tabs, menus, listboxes), arrow keys move within and Tab moves out
-- [ ] Modals trap focus and return focus to the trigger element on close
-
-### Screen reader (WCAG 1.3.1, 2.4.2, 2.4.6, 4.1.2, 4.1.3)
-- [ ] Page title describes the current page uniquely
-- [ ] Heading structure creates a logical outline when navigating by headings
-- [ ] All form inputs announce label, required state, and any error
-- [ ] Dynamic content changes (toasts, errors, loaded results) are announced
-- [ ] Custom widgets announce role and state (expanded/collapsed, selected)
-- [ ] Route changes in SPAs are announced
-- [ ] Icon buttons announce their purpose, not the icon name
-
-### Visual and motion (WCAG 1.4.1, 1.4.10, 1.4.11, 1.4.12, 2.3.*)
-- [ ] Page usable at 200% zoom with no horizontal scroll at 1280px viewport
-- [ ] Page reflows at 320px width without loss of content
-- [ ] Text spacing can be overridden without clipping (line-height 1.5, paragraph 2×, letter 0.12em)
-- [ ] No information conveyed by color alone (check with a grayscale filter)
-- [ ] UI component borders/states meet 3:1 contrast against adjacent colors
-- [ ] Animations respect `prefers-reduced-motion`
-- [ ] No content flashes more than 3× per second
-
-### Forms (WCAG 3.3.1–3.3.8)
-- [ ] Errors identify the problem in text (not just color/icon)
-- [ ] Required fields indicated in the label (not just with a red asterisk)
-- [ ] Input type matches content (email, tel, etc.)
-- [ ] Password fields allow paste
-- [ ] CAPTCHA has a non-cognitive alternative (WCAG 2.2 — 3.3.8)
-- [ ] Multi-step flows don't ask for re-entry of earlier data (WCAG 2.2 — 3.3.7)
-"""
 
 
 def _get_tailwind_replacement(cls: str) -> str:
@@ -352,8 +312,18 @@ def _signature(snippet: str) -> str:
 
 
 def _dedup_key(issue: dict) -> tuple:
+    scanner = _infer_scanner(issue)
+    selector = issue.get("fix_data", {}).get("target", "")
     snippet_norm = re.sub(r"\s+", " ", issue.get("snippet", "")).strip().lower()
-    return (issue["rule_id"], issue["file"], issue["line"], snippet_norm[:120])
+    return (
+        scanner,
+        issue["rule_id"],
+        issue.get("file", ""),
+        issue.get("line", 0),
+        issue.get("journey_step_id", "") or issue.get("fix_data", {}).get("journey_step_id", ""),
+        selector,
+        snippet_norm[:120],
+    )
 
 
 def deduplicate(issues: List[dict]) -> List[dict]:
@@ -374,8 +344,13 @@ def deduplicate(issues: List[dict]) -> List[dict]:
     merged = []
     consumed = set()
     for rule_id, rule_issues in by_rule.items():
-        static_issues = [i for i in rule_issues if i["line"] > 0]
-        runtime_issues = [i for i in rule_issues if i["line"] == 0]
+        static_issues = [i for i in rule_issues if _infer_scanner(i) == "static"]
+        runtime_issues = [i for i in rule_issues if _infer_scanner(i) == "runtime"]
+        stateful_issues = [i for i in rule_issues if _infer_scanner(i) == "stateful"]
+        other_issues = [
+            i for i in rule_issues
+            if _infer_scanner(i) not in {"static", "runtime", "stateful"}
+        ]
 
         for static_issue in static_issues:
             static_sig = _signature(static_issue.get("snippet", ""))
@@ -390,6 +365,9 @@ def deduplicate(issues: List[dict]) -> List[dict]:
         for runtime_issue in runtime_issues:
             if id(runtime_issue) not in consumed:
                 merged.append(runtime_issue)
+
+        merged.extend(stateful_issues)
+        merged.extend(other_issues)
 
     return merged
 
@@ -431,6 +409,15 @@ def _relative_artifact_path(path_str: str, output_dir: Path) -> str:
 
 
 def _infer_scanner(issue: dict) -> str:
+    scanner = issue.get("scanner", "")
+    if scanner in SCANNER_VALUES:
+        return scanner
+    if (
+        issue.get("framework") == "stateful"
+        or issue.get("journey_step_id")
+        or issue.get("fix_data", {}).get("journey_step_id")
+    ):
+        return "stateful"
     if issue.get("framework") == "runtime" or issue.get("origin_rule_id") or issue.get("fix_data", {}).get("axe_rule"):
         return "runtime"
     return "static"
@@ -496,12 +483,22 @@ def _confirmed_by(issue: dict, scanner: str) -> List[str]:
     confirmed = {scanner}
     if issue.get("fix_data", {}).get("confirmed_by_runtime"):
         confirmed.add("runtime")
+    if issue.get("fix_data", {}).get("confirmed_by_stateful"):
+        confirmed.add("stateful")
     return sorted(confirmed)
 
 
 def _fingerprint(issue: dict, scanner: str) -> str:
     selector = issue.get("fix_data", {}).get("target", "")
     snippet_sig = _signature(issue.get("snippet", ""))
+    step_id = issue.get("journey_step_id", "") or issue.get("fix_data", {}).get("journey_step_id", "")
+    if scanner == "stateful":
+        return "|".join([
+            issue["rule_id"],
+            str(issue.get("file", "")),
+            selector or snippet_sig,
+            step_id,
+        ])
     if scanner == "runtime":
         return "|".join([
             issue["rule_id"],
@@ -522,14 +519,14 @@ def _finding_id(fingerprint: str) -> str:
 
 def _normalize_location(issue: dict) -> dict:
     scanner = _infer_scanner(issue)
-    if scanner == "runtime":
+    if scanner in {"runtime", "stateful"}:
         return {
             "file": "",
             "line": 0,
             "column": 0,
             "url": issue.get("file", ""),
             "selector": issue.get("fix_data", {}).get("target", ""),
-            "journey_step_id": "",
+            "journey_step_id": issue.get("journey_step_id", "") or issue.get("fix_data", {}).get("journey_step_id", ""),
         }
     return {
         "file": issue.get("file", ""),
@@ -544,7 +541,7 @@ def _normalize_location(issue: dict) -> dict:
 def _normalize_evidence(issue: dict, output_dir: Path) -> dict:
     scanner = _infer_scanner(issue)
     screenshot = issue.get("fix_data", {}).get("screenshot", "")
-    if scanner == "runtime":
+    if scanner in {"runtime", "stateful"}:
         return {
             "snippet": "",
             "dom_snippet": issue.get("snippet", ""),
@@ -898,6 +895,7 @@ def validate_report_schema(report: dict) -> None:
 def build_report_data(
     static_data: Optional[dict],
     runtime_data: Optional[dict],
+    stateful_data: Optional[dict],
     output_dir: Path,
     detected_at: str,
     status_records: List[dict],
@@ -907,6 +905,8 @@ def build_report_data(
         issues.extend(static_data.get("issues", []))
     if runtime_data:
         issues.extend(runtime_data.get("issues", []))
+    if stateful_data:
+        issues.extend(stateful_data.get("issues", []))
 
     normalized_findings = [
         normalize_finding(issue, detected_at, output_dir)
@@ -954,8 +954,12 @@ def build_report_data(
         },
     }
 
-    target = (static_data or runtime_data or {}).get("target") or ", ".join((runtime_data or {}).get("urls", []))
-    framework = (static_data or {}).get("framework", "unknown")
+    target = (
+        (static_data or runtime_data or {}).get("target")
+        or ", ".join((runtime_data or {}).get("urls", []))
+        or ", ".join(journey.get("start_url", "") for journey in (stateful_data or {}).get("journeys", []))
+    )
+    framework = (static_data or {}).get("framework") or ("stateful" if stateful_data else "unknown")
 
     report = {
         "schema_version": SCANNER_VERSION,
@@ -975,10 +979,287 @@ def build_report_data(
     return report
 
 
+def _unique_step_ids(items: Iterable[dict], actions: Optional[Iterable[str]] = None) -> List[str]:
+    allowed = set(actions or [])
+    seen = []
+    for item in items:
+        action = item.get("action", "")
+        if allowed and action not in allowed:
+            continue
+        step_id = item.get("journey_step_id", "")
+        if step_id and step_id not in seen:
+            seen.append(step_id)
+    return seen
+
+
+def _step_context_label(step_ids: List[str], fallback: str) -> str:
+    if not step_ids:
+        return fallback
+    if len(step_ids) == 1:
+        return f"step `{step_ids[0]}`"
+    joined = ", ".join(f"`{step_id}`" for step_id in step_ids)
+    return f"steps {joined}"
+
+
+def _collect_manual_context(report: dict, stateful_data: Optional[dict]) -> dict:
+    active_findings = [
+        finding for finding in report["findings"]
+        if finding["status"] == "open" and finding["triage_group"] != "not_checked"
+    ]
+    lower_blob = " ".join(
+        " ".join([
+            finding["rule_id"],
+            finding["location"].get("selector", ""),
+            finding["location"].get("journey_step_id", ""),
+            finding["evidence"].get("snippet", ""),
+            finding["evidence"].get("dom_snippet", ""),
+        ]).lower()
+        for finding in active_findings
+    )
+
+    transitions = list((stateful_data or {}).get("focus_transitions", []))
+    step_failures = list((stateful_data or {}).get("step_failures", []))
+    checkpoint_urls = {
+        checkpoint.get("url", "")
+        for checkpoint in (stateful_data or {}).get("checkpoints", [])
+        if checkpoint.get("url")
+    }
+
+    has_forms = (
+        any(
+            finding["rule_id"] in {"input-missing-label", "input-placeholder-as-label", "duplicate-id"}
+            for finding in active_findings
+        )
+        or any(event.get("action") in {"fill", "select"} for event in transitions)
+        or any(token in lower_blob for token in ("<input", "<select", "<textarea", "<form"))
+    )
+    overlay_steps = _unique_step_ids(
+        [
+            event for event in transitions
+            if any(token in " ".join(str(value) for value in event.values()).lower() for token in ("dialog", "modal"))
+        ]
+        + [
+            {
+                "journey_step_id": finding["location"].get("journey_step_id", ""),
+                "action": "",
+            }
+            for finding in active_findings
+            if any(token in (
+                (finding["location"].get("selector", "") + " " + finding["evidence"].get("dom_snippet", "")).lower()
+            ) for token in ("dialog", "modal"))
+        ]
+    )
+    route_steps = _unique_step_ids(
+        [
+            event for event in transitions
+            if event.get("action") == "navigate" or event.get("before_url", "") != event.get("url", "")
+        ]
+    )
+    has_route_change = bool(route_steps) or len(checkpoint_urls) > 1
+    has_dynamic_updates = bool(transitions or step_failures)
+
+    return {
+        "has_forms": has_forms,
+        "has_overlay": bool(overlay_steps),
+        "overlay_steps": overlay_steps,
+        "route_steps": route_steps,
+        "has_route_change": has_route_change,
+        "has_dynamic_updates": has_dynamic_updates,
+        "step_failures": step_failures,
+    }
+
+
+def generate_manual_review_items(report: dict, stateful_data: Optional[dict]) -> List[dict]:
+    context = _collect_manual_context(report, stateful_data)
+    items = [
+        {
+            "title": "Keyboard tab order through the audited page or flow",
+            "capability": "keyboard",
+            "wcag": ["2.1.1", "2.4.3"],
+            "context": "Use the current page-load state and every audited interaction state.",
+            "steps": [
+                "Press Tab from the browser chrome into the page and keep tabbing until focus returns to the browser or the end of the flow.",
+                "Repeat with Shift+Tab to verify the reverse order.",
+            ],
+            "expected": [
+                "Every interactive element is reachable in a logical visual order.",
+                "No keyboard trap appears and focus never jumps to hidden or inert UI.",
+            ],
+        },
+        {
+            "title": "Focus visibility and focus return behavior",
+            "capability": "visual",
+            "wcag": ["2.4.7", "2.4.11"],
+            "context": "Check each interactive state reached during the audit.",
+            "steps": [
+                "Tab to each control, including links, buttons, fields, and custom widgets.",
+                "Trigger any overlays, menus, or popovers that appear in the audited flow and then close them.",
+            ],
+            "expected": [
+                "The active element has a visible focus indicator with sufficient contrast.",
+                "When transient UI closes, focus returns to a sensible trigger or next logical control.",
+            ],
+        },
+        {
+            "title": "Heading outline and page title announcement",
+            "capability": "screen reader",
+            "wcag": ["1.3.1", "2.4.2", "2.4.6"],
+            "context": "Inspect the current page and any post-interaction destination states.",
+            "steps": [
+                "Open the page or flow with a screen reader rotor/list-of-headings view.",
+                "Move by heading level and confirm the document title after each destination change.",
+            ],
+            "expected": [
+                "The title uniquely identifies the current page or state.",
+                "Heading levels form a logical outline without skipped or decorative headings being announced as structure.",
+            ],
+        },
+        {
+            "title": "Zoom, reflow, and text spacing resilience",
+            "capability": "browser",
+            "wcag": ["1.4.10", "1.4.12"],
+            "context": "Run this on the main page and any key post-interaction view.",
+            "steps": [
+                "Check the page at 200% zoom and then at 320px CSS width.",
+                "Override text spacing to line-height 1.5, paragraph spacing 2x, letter spacing 0.12em, and word spacing 0.16em.",
+            ],
+            "expected": [
+                "Content remains usable without horizontal scrolling for main reading content.",
+                "No clipping, overlap, or lost controls appear when text spacing is increased.",
+            ],
+        },
+        {
+            "title": "Reduced motion and motion-triggered interactions",
+            "capability": "visual",
+            "wcag": ["2.3.*"],
+            "context": "Repeat the audited journey with reduced motion enabled if the UI animates.",
+            "steps": [
+                "Turn on the OS or browser reduced-motion preference and replay the audited flow.",
+                "Trigger any animated transitions, expanding sections, or route changes observed during the scan.",
+            ],
+            "expected": [
+                "Non-essential motion is reduced or removed.",
+                "Animations do not block task completion or hide focus movement.",
+            ],
+        },
+        {
+            "title": "Use-of-color-only communication",
+            "capability": "visual",
+            "wcag": ["1.4.1"],
+            "context": "Check interactive controls, validation states, charts, and inline status messages.",
+            "steps": [
+                "Review the page in grayscale or with color filters disabled.",
+                "Inspect success, error, selected, and required states across the audited flow.",
+            ],
+            "expected": [
+                "Meaning is still clear without color perception.",
+                "Status and selection are conveyed with text, iconography, or structural cues in addition to color.",
+            ],
+        },
+    ]
+
+    if context["has_overlay"]:
+        overlay_label = _step_context_label(context["overlay_steps"], "the overlay interactions")
+        items.append({
+            "title": "Overlay escape, trap, and focus return",
+            "capability": "keyboard",
+            "wcag": ["2.1.2", "2.4.3"],
+            "context": f"Replay {overlay_label}.",
+            "steps": [
+                f"Open the overlay reached in {overlay_label} and press Tab until you wrap through the controls.",
+                "Press Escape and then reopen the overlay once more.",
+            ],
+            "expected": [
+                "Focus stays inside the overlay while it is open, unless the pattern intentionally allows background interaction.",
+                "Escape closes the overlay when appropriate, and focus returns to the trigger or next logical control.",
+            ],
+        })
+
+    if context["has_forms"]:
+        items.append({
+            "title": "Form labels, errors, and required-state announcements",
+            "capability": "screen reader",
+            "wcag": ["3.3.1", "3.3.2", "4.1.2", "4.1.3"],
+            "context": "Use the form states reached in the audited flow, including invalid submissions.",
+            "steps": [
+                "Move through each field with a screen reader and listen for label, role, value, and required state.",
+                "Submit the form with missing or invalid data and listen for the first announced error.",
+            ],
+            "expected": [
+                "Every field announces a clear programmatic label and required status.",
+                "Errors are announced in text, associated to the affected field, and do not rely on color alone.",
+            ],
+        })
+
+    if context["has_dynamic_updates"]:
+        items.append({
+            "title": "Dynamic status and validation announcements",
+            "capability": "screen reader",
+            "wcag": ["4.1.3"],
+            "context": "Replay the audited interaction steps that update content without a full reload.",
+            "steps": [
+                "Trigger each audited state change that updates content, validation, or inline status.",
+                "Listen for live-region, alert, or status announcements without moving virtual cursor focus manually.",
+            ],
+            "expected": [
+                "Important updates are announced promptly.",
+                "Announcements are concise and do not double-announce stale content.",
+            ],
+        })
+
+    if context["has_route_change"]:
+        route_label = _step_context_label(context["route_steps"], "the audited navigation steps")
+        items.append({
+            "title": "SPA route change announcement and focus placement",
+            "capability": "screen reader",
+            "wcag": ["2.4.3", "4.1.3"],
+            "context": f"Replay {route_label}.",
+            "steps": [
+                f"Trigger the route change in {route_label}.",
+                "After navigation, inspect the next focus target and listen for the destination announcement.",
+            ],
+            "expected": [
+                "The destination announces a meaningful title, heading, or status change.",
+                "Focus lands on a sensible element for the new view instead of remaining on stale UI.",
+            ],
+        })
+
+    return items
+
+
+def _render_manual_checklist(items: List[dict], step_failures: List[dict]) -> List[str]:
+    lines = []
+    if step_failures:
+        lines.append("Recorded journey step failures:")
+        for failure in step_failures:
+            lines.append(
+                f"- `{failure.get('journey_step_id', '')}` ({failure.get('action', '')}) — {failure.get('message', '')}"
+            )
+        lines.append("")
+
+    lines.append("Assisted checks:")
+    lines.append("")
+    for index, item in enumerate(items, start=1):
+        lines.append(f"### {index}. {item['title']}")
+        lines.append(f"**Capability**: `{item['capability']}`")
+        lines.append(f"**WCAG**: {', '.join(item['wcag'])}")
+        lines.append(f"**Context**: {item['context']}")
+        lines.append("**How to test**:")
+        for step in item["steps"]:
+            lines.append(f"- [ ] {step}")
+        lines.append("**Expected result**:")
+        for expected in item["expected"]:
+            lines.append(f"- [ ] {expected}")
+        lines.append("")
+    return lines
+
+
 def _display_location(finding: dict) -> str:
     location = finding["location"]
     if location["file"]:
         return f"`{location['file']}:{location['line']}`" if location["line"] else f"`{location['file']}`"
+    if location["journey_step_id"]:
+        return f"`{location['url']}` after step `{location['journey_step_id']}`"
     return f"`{location['url']}`"
 
 
@@ -998,7 +1279,7 @@ def _finding_message(finding: dict, message_lookup: Dict[str, str]) -> str:
     return message_lookup.get(finding["fingerprint"], "") or finding["title"]
 
 
-def build_markdown_report(report: dict, message_lookup: Dict[str, str]) -> str:
+def build_markdown_report(report: dict, message_lookup: Dict[str, str], manual_items: List[dict], step_failures: List[dict]) -> str:
     findings = report["findings"]
     active_findings = [f for f in findings if f["status"] == "open" and f["triage_group"] != "not_checked"]
     groups = defaultdict(list)
@@ -1102,7 +1383,8 @@ def build_markdown_report(report: dict, message_lookup: Dict[str, str]) -> str:
             lines.append("")
     lines.append("These require you to test with actual assistive technology or in the browser. "
                  "Automated tools catch roughly a third of accessibility issues — the rest live here.")
-    lines.append(MANUAL_CHECKLIST)
+    lines.append("")
+    lines.extend(_render_manual_checklist(manual_items, step_failures))
     lines.append("---\n")
 
     if waived_findings:
@@ -1151,31 +1433,37 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--static", type=str, help="Path to static scanner JSON")
     parser.add_argument("--runtime", type=str, help="Path to runtime scanner JSON")
+    parser.add_argument("--stateful", type=str, help="Path to stateful scanner JSON")
     parser.add_argument("--output", type=str, help="Output markdown path (default: stdout)")
     parser.add_argument("--json-output", type=str, help="Output normalized JSON report")
     parser.add_argument("--status-file", type=str, help="Optional JSON file with status/waiver records")
     parser.add_argument("--detected-at", type=str, help="Override detected_at timestamp (for tests)")
     args = parser.parse_args()
 
-    if not (args.static or args.runtime):
-        parser.error("Provide --static, --runtime, or both.")
+    if not (args.static or args.runtime or args.stateful):
+        parser.error("Provide --static, --runtime, --stateful, or any combination.")
 
     static_data = json.loads(Path(args.static).read_text()) if args.static else None
     runtime_data = json.loads(Path(args.runtime).read_text()) if args.runtime else None
+    stateful_data = json.loads(Path(args.stateful).read_text()) if args.stateful else None
 
     detected_at = args.detected_at or _now_iso()
     output_dir = _output_dir(args.output, args.json_output)
     status_records = load_status_records(args.status_file)
-    report = build_report_data(static_data, runtime_data, output_dir, detected_at, status_records)
+    report = build_report_data(static_data, runtime_data, stateful_data, output_dir, detected_at, status_records)
 
     raw_issues = []
     if static_data:
         raw_issues.extend(static_data.get("issues", []))
     if runtime_data:
         raw_issues.extend(runtime_data.get("issues", []))
+    if stateful_data:
+        raw_issues.extend(stateful_data.get("issues", []))
     message_lookup = _build_message_lookup(deduplicate(raw_issues))
 
-    markdown_report = build_markdown_report(report, message_lookup)
+    manual_items = generate_manual_review_items(report, stateful_data)
+    step_failures = list((stateful_data or {}).get("step_failures", []))
+    markdown_report = build_markdown_report(report, message_lookup, manual_items, step_failures)
 
     if args.output:
         Path(args.output).write_text(markdown_report, encoding="utf-8")

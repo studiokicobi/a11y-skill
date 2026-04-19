@@ -1,0 +1,28 @@
+{
+  "scanner": "runtime",
+  "urls": [
+    "https://example.test/settings"
+  ],
+  "issues": [
+    {
+      "rule_id": "img-missing-alt",
+      "origin_rule_id": "image-alt",
+      "wcag": "1.1.1",
+      "file": "https://example.test/settings",
+      "line": 0,
+      "col": 0,
+      "snippet": "<img class=\"hero\" src=\"hero.png\">",
+      "message": "Images must have alternate text",
+      "framework": "runtime",
+      "triage_hint": "input",
+      "fix_data": {
+        "axe_rule": "image-alt",
+        "impact": "serious",
+        "target": "main > img.hero",
+        "help_url": "https://dequeuniversity.com/rules/axe/4.9/image-alt",
+        "failure_summary": "",
+        "result_type": "violation"
+      }
+    }
+  ]
+}

@@ -1,14 +1,12 @@
 # Accessibility Audit Report
 
-**Target**: http://localhost:3000
-**Framework**: unknown
+**Target**: https://example.test/settings
+**Framework**: stateful
 **Standard**: WCAG 2.2 Level AA
 **Date**: <DATE>
 
 ## Summary
-Found 1 scanner-detected issues: **0 auto-fixable**, **1 need your input**, plus a manual checklist below. (0 scanner-flagged items require manual review.)
-By source: runtime 1.
-By confidence: high 1.
+Found 0 scanner-detected issues: **0 auto-fixable**, **0 need your input**, plus a manual checklist below. (0 scanner-flagged items require manual review.)
 
 ---
 
@@ -18,24 +16,18 @@ _None._
 
 ---
 
-## Group 2: Needs your input (1 issues)
+## Group 2: Needs your input (0 issues)
 
-These need a decision from you. The agent can draft each fix once you answer.
-
-### 1. [WCAG 1.4.3] — Color contrast failure (runtime)
-**Location**: `http://localhost:3000`
-**Issue**: Elements must meet minimum color contrast ratio thresholds
-**Decision needed**: Pick an accessible color that aligns with your brand — we'll suggest 2–3 options if you want.
-**Current code**:
-```
-<p class="muted-copy">Low contrast helper text</p>
-```
+_None._
 
 ---
 
 ## Group 3: Manual checklist
 
 These require you to test with actual assistive technology or in the browser. Automated tools catch roughly a third of accessibility issues — the rest live here.
+
+Recorded journey step failures:
+- `submit-invalid` (click) — Example failure note for manual follow-up.
 
 Assisted checks:
 
@@ -104,6 +96,50 @@ Assisted checks:
 **Expected result**:
 - [ ] Meaning is still clear without color perception.
 - [ ] Status and selection are conveyed with text, iconography, or structural cues in addition to color.
+
+### 7. Overlay escape, trap, and focus return
+**Capability**: `keyboard`
+**WCAG**: 2.1.2, 2.4.3
+**Context**: Replay step `open-modal`.
+**How to test**:
+- [ ] Open the overlay reached in step `open-modal` and press Tab until you wrap through the controls.
+- [ ] Press Escape and then reopen the overlay once more.
+**Expected result**:
+- [ ] Focus stays inside the overlay while it is open, unless the pattern intentionally allows background interaction.
+- [ ] Escape closes the overlay when appropriate, and focus returns to the trigger or next logical control.
+
+### 8. Form labels, errors, and required-state announcements
+**Capability**: `screen reader`
+**WCAG**: 3.3.1, 3.3.2, 4.1.2, 4.1.3
+**Context**: Use the form states reached in the audited flow, including invalid submissions.
+**How to test**:
+- [ ] Move through each field with a screen reader and listen for label, role, value, and required state.
+- [ ] Submit the form with missing or invalid data and listen for the first announced error.
+**Expected result**:
+- [ ] Every field announces a clear programmatic label and required status.
+- [ ] Errors are announced in text, associated to the affected field, and do not rely on color alone.
+
+### 9. Dynamic status and validation announcements
+**Capability**: `screen reader`
+**WCAG**: 4.1.3
+**Context**: Replay the audited interaction steps that update content without a full reload.
+**How to test**:
+- [ ] Trigger each audited state change that updates content, validation, or inline status.
+- [ ] Listen for live-region, alert, or status announcements without moving virtual cursor focus manually.
+**Expected result**:
+- [ ] Important updates are announced promptly.
+- [ ] Announcements are concise and do not double-announce stale content.
+
+### 10. SPA route change announcement and focus placement
+**Capability**: `screen reader`
+**WCAG**: 2.4.3, 4.1.3
+**Context**: Replay step `go-dashboard`.
+**How to test**:
+- [ ] Trigger the route change in step `go-dashboard`.
+- [ ] After navigation, inspect the next focus target and listen for the destination announcement.
+**Expected result**:
+- [ ] The destination announces a meaningful title, heading, or status change.
+- [ ] Focus lands on a sensible element for the new view instead of remaining on stale UI.
 
 ---
 

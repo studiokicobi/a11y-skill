@@ -1,14 +1,14 @@
 # Accessibility Audit Report
 
-**Target**: http://localhost:3000
-**Framework**: unknown
+**Target**: https://example.test/settings
+**Framework**: stateful
 **Standard**: WCAG 2.2 Level AA
 **Date**: <DATE>
 
 ## Summary
-Found 1 scanner-detected issues: **0 auto-fixable**, **1 need your input**, plus a manual checklist below. (0 scanner-flagged items require manual review.)
-By source: runtime 1.
-By confidence: high 1.
+Found 2 scanner-detected issues: **0 auto-fixable**, **2 need your input**, plus a manual checklist below. (0 scanner-flagged items require manual review.)
+By source: runtime 1, stateful 1.
+By confidence: high 2.
 
 ---
 
@@ -18,17 +18,26 @@ _None._
 
 ---
 
-## Group 2: Needs your input (1 issues)
+## Group 2: Needs your input (2 issues)
 
 These need a decision from you. The agent can draft each fix once you answer.
 
-### 1. [WCAG 1.4.3] — Color contrast failure (runtime)
-**Location**: `http://localhost:3000`
-**Issue**: Elements must meet minimum color contrast ratio thresholds
-**Decision needed**: Pick an accessible color that aligns with your brand — we'll suggest 2–3 options if you want.
+### 1. [WCAG 1.1.1] — Image missing alt attribute
+**Location**: `https://example.test/settings`
+**Issue**: Images must have alternate text
+**Decision needed**: What does this image convey? (For decorative images, we'll use alt="".)
 **Current code**:
 ```
-<p class="muted-copy">Low contrast helper text</p>
+<img class="hero" src="hero.png">
+```
+
+### 2. [WCAG 1.1.1] — Image missing alt attribute
+**Location**: `https://example.test/settings` after step `open-modal`
+**Issue**: Images must have alternate text
+**Decision needed**: What does this image convey? (For decorative images, we'll use alt="".)
+**Current code**:
+```
+<img class="dialog-image" src="summary.png">
 ```
 
 ---
@@ -104,6 +113,28 @@ Assisted checks:
 **Expected result**:
 - [ ] Meaning is still clear without color perception.
 - [ ] Status and selection are conveyed with text, iconography, or structural cues in addition to color.
+
+### 7. Overlay escape, trap, and focus return
+**Capability**: `keyboard`
+**WCAG**: 2.1.2, 2.4.3
+**Context**: Replay step `open-modal`.
+**How to test**:
+- [ ] Open the overlay reached in step `open-modal` and press Tab until you wrap through the controls.
+- [ ] Press Escape and then reopen the overlay once more.
+**Expected result**:
+- [ ] Focus stays inside the overlay while it is open, unless the pattern intentionally allows background interaction.
+- [ ] Escape closes the overlay when appropriate, and focus returns to the trigger or next logical control.
+
+### 8. Dynamic status and validation announcements
+**Capability**: `screen reader`
+**WCAG**: 4.1.3
+**Context**: Replay the audited interaction steps that update content without a full reload.
+**How to test**:
+- [ ] Trigger each audited state change that updates content, validation, or inline status.
+- [ ] Listen for live-region, alert, or status announcements without moving virtual cursor focus manually.
+**Expected result**:
+- [ ] Important updates are announced promptly.
+- [ ] Announcements are concise and do not double-announce stale content.
 
 ---
 

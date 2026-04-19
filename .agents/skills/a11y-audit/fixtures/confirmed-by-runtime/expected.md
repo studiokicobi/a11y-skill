@@ -1,13 +1,13 @@
 # Accessibility Audit Report
 
-**Target**: http://localhost:3000
-**Framework**: unknown
+**Target**: fixtures/confirmed-by-runtime
+**Framework**: html
 **Standard**: WCAG 2.2 Level AA
 **Date**: <DATE>
 
 ## Summary
 Found 1 scanner-detected issues: **0 auto-fixable**, **1 need your input**, plus a manual checklist below. (0 scanner-flagged items require manual review.)
-By source: runtime 1.
+By source: static 1.
 By confidence: high 1.
 
 ---
@@ -22,13 +22,13 @@ _None._
 
 These need a decision from you. The agent can draft each fix once you answer.
 
-### 1. [WCAG 1.4.3] — Color contrast failure (runtime)
-**Location**: `http://localhost:3000`
-**Issue**: Elements must meet minimum color contrast ratio thresholds
-**Decision needed**: Pick an accessible color that aligns with your brand — we'll suggest 2–3 options if you want.
+### 1. [WCAG 1.1.1] — Image missing alt attribute
+**Location**: `fixtures/confirmed-by-runtime/index.html:12`
+**Issue**: Image is missing an alt attribute.
+**Decision needed**: What does this image convey? (For decorative images, we'll use alt="".)
 **Current code**:
 ```
-<p class="muted-copy">Low contrast helper text</p>
+<img src="/logo.png">
 ```
 
 ---

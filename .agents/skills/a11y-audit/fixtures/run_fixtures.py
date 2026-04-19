@@ -26,6 +26,7 @@ FIXTURES_ROOT = Path(__file__).parent
 SCANNER = SKILL_ROOT / "scripts" / "a11y_scan.py"
 TRIAGE = SKILL_ROOT / "scripts" / "triage.py"
 RUNTIME = SKILL_ROOT / "scripts" / "a11y_runtime.js"
+STATEFUL = SKILL_ROOT / "scripts" / "a11y_stateful.js"
 FIXED_DETECTED_AT = "2026-01-02T03:04:05Z"
 
 
@@ -154,6 +155,77 @@ def normalize_runtime_output(runtime_output: dict, fixture_name: str) -> dict:
     return out
 
 
+def normalize_stateful_output(stateful_output: dict, fixture_name: str) -> dict:
+    fixture_root = FIXTURES_ROOT / fixture_name
+
+    def normalize_url(value: str) -> str:
+        if not value:
+            return ""
+        if not value.startswith("file://"):
+            return value
+        base_value, hash_sep, fragment = value.partition("#")
+        for candidate in fixture_root.rglob("*"):
+            if candidate.is_file() and candidate.resolve().as_uri() == base_value:
+                relative = candidate.relative_to(fixture_root).as_posix()
+                normalized = f"file://fixtures/{fixture_name}/{relative}"
+                return f"{normalized}#{fragment}" if hash_sep else normalized
+        return value
+
+    def normalize_screenshot(value: str) -> str:
+        if not value:
+            return ""
+        screenshot_path = Path(value)
+        if not screenshot_path.is_absolute():
+            return value
+        parent = screenshot_path.parent.name
+        return f"{parent}/{screenshot_path.name}" if parent else screenshot_path.name
+
+    out = {
+        "scanner": stateful_output["scanner"],
+        "engine": stateful_output.get("engine", ""),
+        "browser": stateful_output.get("browser", ""),
+        "issue_count": stateful_output["issue_count"],
+        "checkpoint_count": len(stateful_output.get("checkpoints", [])),
+        "step_failure_count": len(stateful_output.get("step_failures", [])),
+        "issues": [],
+        "checkpoints": [],
+        "focus_transitions": [],
+    }
+    for issue in stateful_output.get("issues", []):
+        out["issues"].append({
+            "rule_id": issue["rule_id"],
+            "origin_rule_id": issue.get("origin_rule_id", ""),
+            "wcag": issue["wcag"],
+            "file": normalize_url(issue["file"]),
+            "journey_step_id": issue.get("journey_step_id", ""),
+            "triage_hint": issue["triage_hint"],
+            "result_type": issue.get("fix_data", {}).get("result_type", ""),
+            "target": issue.get("fix_data", {}).get("target", ""),
+            "screenshot": normalize_screenshot(issue.get("fix_data", {}).get("screenshot", "")),
+        })
+    for checkpoint in stateful_output.get("checkpoints", []):
+        out["checkpoints"].append({
+            "journey_id": checkpoint.get("journey_id", ""),
+            "journey_step_id": checkpoint.get("journey_step_id", ""),
+            "url": normalize_url(checkpoint.get("url", "")),
+            "issue_count": checkpoint.get("counts", {}).get("issues", 0),
+            "screenshot": normalize_screenshot(checkpoint.get("screenshot", "")),
+        })
+    for transition in stateful_output.get("focus_transitions", []):
+        out["focus_transitions"].append({
+            "journey_step_id": transition.get("journey_step_id", ""),
+            "action": transition.get("action", ""),
+            "before_url": normalize_url(transition.get("before_url", "")),
+            "url": normalize_url(transition.get("url", "")),
+            "before": transition.get("before", ""),
+            "after": transition.get("after", ""),
+        })
+    out["issues"].sort(key=lambda item: (item["journey_step_id"], item["rule_id"], item["target"]))
+    out["checkpoints"].sort(key=lambda item: (item["journey_step_id"], item["url"]))
+    out["focus_transitions"].sort(key=lambda item: (item["journey_step_id"], item["action"]))
+    return out
+
+
 def run_static_fixture(fixture_dir: Path, update: bool = False) -> bool:
     """Returns True if the static fixture passes (or was updated), False on failure."""
     name = fixture_dir.name
@@ -251,6 +323,50 @@ def run_runtime_smoke_fixture(fixture_dir: Path, update: bool = False) -> bool:
     return False
 
 
+def run_stateful_smoke_fixture(fixture_dir: Path, update: bool = False) -> bool:
+    name = fixture_dir.name
+    expected_path = fixture_dir / "expected.stateful.json"
+    output_path = Path("/tmp/stateful-actual.json")
+    screenshot_dir = Path("/tmp/stateful-screenshots")
+    config_path = fixture_dir / "journey.config.json"
+
+    cmd = [
+        "node",
+        str(STATEFUL),
+        "--config",
+        str(config_path),
+        "--output",
+        str(output_path),
+    ]
+    if screenshot_dir:
+        cmd.extend(["--screenshot-dir", str(screenshot_dir)])
+
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    if result.returncode != 0:
+        print(f"  FAIL {name}: stateful scan exited {result.returncode}")
+        print(f"        stderr: {result.stderr.strip()}")
+        return False
+
+    actual = normalize_stateful_output(json.loads(output_path.read_text()), name)
+
+    if update:
+        expected_path.write_text(json.dumps(actual, indent=2) + "\n")
+        print(f"  UPDATED {name}: stateful snapshot refreshed")
+        return True
+
+    if not expected_path.exists():
+        print(f"  FAIL {name}: no expected.stateful.json found (run with --update to create)")
+        return False
+
+    expected = json.loads(expected_path.read_text())
+    if actual == expected:
+        print(f"  PASS {name}: stateful scan matched snapshot")
+        return True
+
+    print(f"  FAIL {name}: stateful scan differed from expected.stateful.json")
+    return False
+
+
 def run_runtime_error_fixture(fixture_dir: Path) -> bool:
     name = fixture_dir.name
     expected_path = fixture_dir / "expected.error.txt"
@@ -289,6 +405,7 @@ def run_triage_fixture(fixture_dir: Path, update: bool = False) -> bool:
     expected_markdown_path = fixture_dir / "expected.md"
     expected_json_path = fixture_dir / "expected.report.json"
     runtime_path = fixture_dir / "runtime.json"
+    stateful_path = fixture_dir / "stateful.json"
     static_path = fixture_dir / "static.json"
     status_path = fixture_dir / "status.json"
     output_markdown_path = Path("/tmp/triage-report.md")
@@ -308,6 +425,8 @@ def run_triage_fixture(fixture_dir: Path, update: bool = False) -> bool:
         cmd.extend(["--static", str(static_path)])
     if runtime_path.exists():
         cmd.extend(["--runtime", str(runtime_path)])
+    if stateful_path.exists():
+        cmd.extend(["--stateful", str(stateful_path)])
     if status_path.exists():
         cmd.extend(["--status-file", str(status_path)])
 
@@ -352,11 +471,13 @@ def run_triage_fixture(fixture_dir: Path, update: bool = False) -> bool:
 
 def run_fixture(fixture_dir: Path, update: bool = False) -> bool:
     """Returns True if the fixture passes (or was updated), False on failure."""
+    if (fixture_dir / "expected.stateful.json").exists():
+        return run_stateful_smoke_fixture(fixture_dir, update=update)
     if (fixture_dir / "expected.runtime.json").exists():
         return run_runtime_smoke_fixture(fixture_dir, update=update)
     if (fixture_dir / "expected.error.txt").exists():
         return run_runtime_error_fixture(fixture_dir)
-    if (fixture_dir / "runtime.json").exists() or (fixture_dir / "static.json").exists():
+    if (fixture_dir / "runtime.json").exists() or (fixture_dir / "static.json").exists() or (fixture_dir / "stateful.json").exists():
         return run_triage_fixture(fixture_dir, update=update)
     return run_static_fixture(fixture_dir, update=update)
 
@@ -368,7 +489,7 @@ def main():
     parser.add_argument("--only", type=str, default=None,
                         help="Run only the named fixture")
     parser.add_argument("--live-runtime", action="store_true",
-                        help="Include live Playwright runtime smoke fixtures")
+                        help="Include live Playwright browser fixtures")
     args = parser.parse_args()
 
     fixtures = sorted(
@@ -379,7 +500,7 @@ def main():
             or (d / "expected.md").exists()
             or (d / "expected.report.json").exists()
             or (d / "expected.error.txt").exists()
-            or (args.live_runtime and (d / "expected.runtime.json").exists())
+            or (args.live_runtime and ((d / "expected.runtime.json").exists() or (d / "expected.stateful.json").exists()))
         )
     )
     if args.only:
