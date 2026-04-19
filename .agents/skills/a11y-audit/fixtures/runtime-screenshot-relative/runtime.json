@@ -1,0 +1,45 @@
+{
+  "scanner": "runtime",
+  "engine": "playwright",
+  "browser": "chromium",
+  "urls": [
+    "http://localhost:3000"
+  ],
+  "per_url_counts": {
+    "http://localhost:3000": 1
+  },
+  "per_url_result_counts": {
+    "http://localhost:3000": {
+      "issues": 1,
+      "violations": 1,
+      "incomplete": 0,
+      "passes": 14
+    }
+  },
+  "issue_count": 1,
+  "pass_count": 14,
+  "issues": [
+    {
+      "rule_id": "img-missing-alt",
+      "origin_rule_id": "image-alt",
+      "wcag": "1.1.1",
+      "file": "http://localhost:3000",
+      "line": 0,
+      "col": 0,
+      "snippet": "<img class=\"brand-logo\" src=\"/logo.png\">",
+      "message": "Images must have alternate text",
+      "framework": "runtime",
+      "triage_hint": "input",
+      "fix_data": {
+        "axe_rule": "image-alt",
+        "impact": "serious",
+        "target": "main > img.brand-logo",
+        "help_url": "https://dequeuniversity.com/rules/axe/4.10/image-alt",
+        "failure_summary": "Fix any of the following:\n  Element does not have an alt attribute",
+        "result_type": "violation",
+        "screenshot": "/tmp/runtime-screenshots/runtime-screenshot-relative.png"
+      }
+    }
+  ],
+  "passes": []
+}

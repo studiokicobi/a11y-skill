@@ -1,0 +1,19 @@
+{
+  "scanner": "runtime",
+  "engine": "playwright",
+  "browser": "chromium",
+  "issue_count": 1,
+  "has_passes": true,
+  "issues": [
+    {
+      "rule_id": "img-missing-alt",
+      "origin_rule_id": "image-alt",
+      "wcag": "1.1.1",
+      "file": "file://fixtures/runtime-playwright-basic/index.html",
+      "triage_hint": "input",
+      "result_type": "violation",
+      "target": "img",
+      "screenshot": "runtime-screenshots/index.png"
+    }
+  ]
+}

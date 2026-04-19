@@ -1,0 +1,6 @@
+{
+  "auth": {
+    "mode": "storage_state",
+    "storage_state_path": ".secrets/missing-playwright-auth.json"
+  }
+}

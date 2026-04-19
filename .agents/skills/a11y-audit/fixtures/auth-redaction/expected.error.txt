@@ -1,0 +1,1 @@
+Auth config mode "storage_state" requires an existing storage_state_path. Refresh or provide the Playwright auth state file.

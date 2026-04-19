@@ -1,21 +1,17 @@
 #!/usr/bin/env node
 /**
- * a11y_runtime.js — runtime accessibility scanner using Puppeteer + axe-core.
+ * a11y_runtime.js — runtime accessibility scanner using Playwright + axe-core.
  *
- * Launches a headless browser, loads the target URL, injects axe-core, runs
- * the full WCAG 2.2 AA rule set, and emits JSON findings aligned with the
- * static scanner's format.
+ * Loads one or more target URLs in headless Chromium, injects axe-core, runs
+ * the WCAG 2.2 AA rule set, and emits JSON findings aligned with the static
+ * scanner's format.
  *
- * Auto-installs puppeteer and axe-core on first run if missing.
+ * The script auto-installs `playwright`, `axe-core`, and `yaml` on first use
+ * into a local `.a11y-audit-deps` cache directory.
  *
  * Usage:
- *   node a11y_runtime.js --url http://localhost:3000 [--output results.json]
- *   node a11y_runtime.js --urls url1,url2,url3 --output results.json
- *
- * Output JSON shape matches the static scanner's "issues" array, with these
- * extras on each issue: `origin_rule_id` (the original axe rule ID), `html`
- * (element outer HTML), `target` (CSS selector path), and `impact`
- * (axe severity: critical/serious/moderate/minor).
+ *   node a11y_runtime.js --url http://localhost:3000 --output results.json
+ *   node a11y_runtime.js --urls url1,url2 --config runtime.config.json --output results.json
  */
 
 'use strict';
@@ -24,10 +20,29 @@ const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
 
-// ----- Dependency resolution -----------------------------------------------
+const DEP_CACHE_DIR = path.join(__dirname, '..', '.a11y-audit-deps');
+const BROWSERS_DIR = path.join(DEP_CACHE_DIR, 'ms-playwright');
 
-function ensureDeps() {
-  const required = ['puppeteer', 'axe-core'];
+function ensureDepCache() {
+  if (!fs.existsSync(DEP_CACHE_DIR)) {
+    fs.mkdirSync(DEP_CACHE_DIR, { recursive: true });
+  }
+  const packageJsonPath = path.join(DEP_CACHE_DIR, 'package.json');
+  if (!fs.existsSync(packageJsonPath)) {
+    fs.writeFileSync(
+      packageJsonPath,
+      JSON.stringify({ name: 'a11y-audit-deps', version: '1.0.0', private: true }, null, 2)
+    );
+  }
+  const nodeModulesDir = path.join(DEP_CACHE_DIR, 'node_modules');
+  if (!module.paths.includes(nodeModulesDir)) {
+    module.paths.unshift(nodeModulesDir);
+  }
+}
+
+function ensureDeps(required) {
+  ensureDepCache();
+
   const missing = [];
   for (const dep of required) {
     try {
@@ -36,60 +51,345 @@ function ensureDeps() {
       missing.push(dep);
     }
   }
-  if (missing.length === 0) return;
+  if (missing.length === 0) {
+    return;
+  }
 
   console.error(`Installing required packages: ${missing.join(', ')}...`);
-  // Install to a local .a11y-audit-deps directory to avoid polluting the
-  // target project's node_modules.
-  const cacheDir = path.join(__dirname, '..', '.a11y-audit-deps');
-  if (!fs.existsSync(cacheDir)) {
-    fs.mkdirSync(cacheDir, { recursive: true });
-    fs.writeFileSync(path.join(cacheDir, 'package.json'),
-      JSON.stringify({ name: 'a11y-audit-deps', version: '1.0.0', private: true }));
-  }
   execSync(`npm install --no-audit --no-fund --loglevel=error ${missing.join(' ')}`, {
-    cwd: cacheDir, stdio: 'inherit',
+    cwd: DEP_CACHE_DIR,
+    stdio: 'inherit',
+    env: {
+      ...process.env,
+      PLAYWRIGHT_BROWSERS_PATH: BROWSERS_DIR,
+    },
   });
-  // Add the cache dir to module paths so require() finds the installed packages
-  module.paths.unshift(path.join(cacheDir, 'node_modules'));
+  const nodeModulesDir = path.join(DEP_CACHE_DIR, 'node_modules');
+  if (!module.paths.includes(nodeModulesDir)) {
+    module.paths.unshift(nodeModulesDir);
+  }
 }
 
-ensureDeps();
+function ensurePlaywrightBrowser(playwright) {
+  process.env.PLAYWRIGHT_BROWSERS_PATH = BROWSERS_DIR;
+  const executablePath = playwright.chromium.executablePath();
+  if (fs.existsSync(executablePath)) {
+    return;
+  }
 
-const puppeteer = require('puppeteer');
-const axeSource = fs.readFileSync(
-  require.resolve('axe-core/axe.min.js'), 'utf-8');
+  const cliPath = path.join(DEP_CACHE_DIR, 'node_modules', '.bin', 'playwright');
+  if (!fs.existsSync(cliPath)) {
+    throw new Error('Playwright is installed but the CLI helper is missing.');
+  }
 
+  console.error('Installing Playwright Chromium browser...');
+  execSync(`${JSON.stringify(cliPath)} install chromium`, {
+    cwd: DEP_CACHE_DIR,
+    stdio: 'inherit',
+    env: {
+      ...process.env,
+      PLAYWRIGHT_BROWSERS_PATH: BROWSERS_DIR,
+    },
+  });
+}
 
-// ----- Args ----------------------------------------------------------------
+function parseViewport(value) {
+  const match = /^(\d+)x(\d+)$/i.exec(value || '');
+  if (!match) {
+    throw new Error(`Invalid viewport value "${value}". Use WIDTHxHEIGHT, e.g. 1280x800.`);
+  }
+  return { width: parseInt(match[1], 10), height: parseInt(match[2], 10) };
+}
+
+function normalizeWaitUntil(value) {
+  const normalized = (value || 'networkidle').toLowerCase();
+  if (normalized === 'networkidle2') {
+    return 'networkidle';
+  }
+  if (!['load', 'domcontentloaded', 'networkidle', 'commit'].includes(normalized)) {
+    throw new Error(`Unsupported wait condition "${value}". Use load, domcontentloaded, networkidle, or commit.`);
+  }
+  return normalized;
+}
 
 function parseArgs(argv) {
-  const args = { urls: [], output: null, waitFor: 'networkidle2', timeout: 30000 };
+  const args = {
+    urls: [],
+    output: null,
+    config: null,
+    waitUntil: 'networkidle',
+    timeout: 30000,
+    waitForSelector: '',
+    waitForHiddenSelector: '',
+    screenshotDir: '',
+    viewport: { width: 1280, height: 800 },
+    reducedMotion: 'no-preference',
+    routeBlocklist: [],
+    validateConfigOnly: false,
+  };
+
   for (let i = 2; i < argv.length; i++) {
-    const a = argv[i];
-    if (a === '--url') { args.urls.push(argv[++i]); }
-    else if (a === '--urls') { args.urls.push(...argv[++i].split(',').map(s => s.trim()).filter(Boolean)); }
-    else if (a === '--output') { args.output = argv[++i]; }
-    else if (a === '--wait-for') { args.waitFor = argv[++i]; }
-    else if (a === '--timeout') { args.timeout = parseInt(argv[++i], 10); }
-    else if (a === '--help' || a === '-h') {
-      console.log('Usage: node a11y_runtime.js --url <url> [--output results.json]');
+    const arg = argv[i];
+    if (arg === '--url') {
+      args.urls.push(argv[++i]);
+    } else if (arg === '--urls') {
+      args.urls.push(...argv[++i].split(',').map((item) => item.trim()).filter(Boolean));
+    } else if (arg === '--output') {
+      args.output = argv[++i];
+    } else if (arg === '--config') {
+      args.config = argv[++i];
+    } else if (arg === '--wait-for' || arg === '--wait-until') {
+      args.waitUntil = argv[++i];
+    } else if (arg === '--wait-for-selector') {
+      args.waitForSelector = argv[++i];
+    } else if (arg === '--wait-for-hidden-selector') {
+      args.waitForHiddenSelector = argv[++i];
+    } else if (arg === '--timeout') {
+      args.timeout = parseInt(argv[++i], 10);
+    } else if (arg === '--screenshot-dir') {
+      args.screenshotDir = argv[++i];
+    } else if (arg === '--viewport') {
+      args.viewport = parseViewport(argv[++i]);
+    } else if (arg === '--reduced-motion') {
+      args.reducedMotion = argv[++i];
+    } else if (arg === '--block-route') {
+      args.routeBlocklist.push(argv[++i]);
+    } else if (arg === '--validate-config-only') {
+      args.validateConfigOnly = true;
+    } else if (arg === '--help' || arg === '-h') {
+      console.log(
+        'Usage: node a11y_runtime.js --url <url> [--output results.json] ' +
+        '[--config runtime.config.json] [--screenshot-dir dir]'
+      );
       process.exit(0);
+    } else {
+      throw new Error(`Unknown argument: ${arg}`);
     }
   }
-  if (args.urls.length === 0) {
-    console.error('Error: provide at least one URL via --url or --urls');
-    process.exit(2);
-  }
+
   return args;
 }
 
+function resolvePath(baseDir, value) {
+  if (!value) {
+    return '';
+  }
+  return path.isAbsolute(value) ? value : path.resolve(baseDir, value);
+}
 
-// ----- axe → our format mapper ---------------------------------------------
+function loadConfig(configPath) {
+  if (!configPath) {
+    return { config: {}, baseDir: process.cwd() };
+  }
 
-// Map axe rule IDs to our static-scanner rule IDs where they overlap, so the
-// triage step can deduplicate. For axe rules with no static equivalent, we
-// use the axe rule ID directly.
+  const absolutePath = path.resolve(process.cwd(), configPath);
+  if (!fs.existsSync(absolutePath)) {
+    throw new Error(`Runtime config file not found: ${configPath}`);
+  }
+
+  const extension = path.extname(absolutePath).toLowerCase();
+  const raw = fs.readFileSync(absolutePath, 'utf-8');
+  if (extension === '.json') {
+    return { config: JSON.parse(raw), baseDir: path.dirname(absolutePath) };
+  }
+  if (extension === '.yaml' || extension === '.yml') {
+    ensureDeps(['yaml']);
+    const yaml = require('yaml');
+    return { config: yaml.parse(raw) || {}, baseDir: path.dirname(absolutePath) };
+  }
+  throw new Error('Runtime config files must use .json, .yaml, or .yml.');
+}
+
+function resolveSecretValue(spec, label, baseDir) {
+  if (spec == null) {
+    throw new Error(`Missing value for ${label}.`);
+  }
+  if (typeof spec === 'string') {
+    if (spec.startsWith('env:')) {
+      const envName = spec.slice(4).trim();
+      const value = process.env[envName];
+      if (!value) {
+        throw new Error(`Missing environment variable referenced by ${label}: ${envName}.`);
+      }
+      return value;
+    }
+    if (spec.startsWith('file:')) {
+      const secretPath = resolvePath(baseDir, spec.slice(5).trim());
+      if (!fs.existsSync(secretPath)) {
+        throw new Error(`Missing secret file referenced by ${label}: ${path.basename(secretPath)}.`);
+      }
+      return fs.readFileSync(secretPath, 'utf-8').trim();
+    }
+    return spec;
+  }
+  if (typeof spec === 'object' && !Array.isArray(spec)) {
+    if (spec.env) {
+      return resolveSecretValue(`env:${spec.env}`, label, baseDir);
+    }
+    if (spec.file) {
+      return resolveSecretValue(`file:${spec.file}`, label, baseDir);
+    }
+    if (Object.prototype.hasOwnProperty.call(spec, 'value')) {
+      return String(spec.value);
+    }
+  }
+  throw new Error(`Unsupported secret reference for ${label}. Use env:, file:, or { env/file/value }.`);
+}
+
+function resolveAuth(authConfig, baseDir) {
+  if (!authConfig) {
+    return { mode: 'none' };
+  }
+
+  const mode = String(authConfig.mode || '').trim();
+  if (!mode) {
+    throw new Error('Auth config requires a non-empty mode.');
+  }
+
+  if (mode === 'storage_state') {
+    const storageStatePath = resolvePath(baseDir, authConfig.storage_state_path || '');
+    if (!storageStatePath || !fs.existsSync(storageStatePath)) {
+      throw new Error(
+        'Auth config mode "storage_state" requires an existing storage_state_path. ' +
+        'Refresh or provide the Playwright auth state file.'
+      );
+    }
+    return { mode, storageStatePath };
+  }
+
+  if (mode === 'headers') {
+    const headers = {};
+    const source = authConfig.headers || {};
+    for (const [headerName, valueSpec] of Object.entries(source)) {
+      headers[headerName] = resolveSecretValue(valueSpec, `auth.headers.${headerName}`, baseDir);
+    }
+    if (Object.keys(headers).length === 0) {
+      throw new Error('Auth config mode "headers" requires a non-empty headers object.');
+    }
+    return { mode, headers };
+  }
+
+  if (mode === 'cookies') {
+    const cookiesPath = resolvePath(baseDir, authConfig.cookies_path || '');
+    if (!cookiesPath || !fs.existsSync(cookiesPath)) {
+      throw new Error(
+        'Auth config mode "cookies" requires an existing cookies_path JSON file.'
+      );
+    }
+    const cookies = JSON.parse(fs.readFileSync(cookiesPath, 'utf-8'));
+    if (!Array.isArray(cookies)) {
+      throw new Error('Auth cookies file must contain a JSON array of Playwright cookies.');
+    }
+    return { mode, cookies };
+  }
+
+  throw new Error(`Unsupported auth mode "${mode}". Use storage_state, headers, or cookies.`);
+}
+
+function mergePageConfig(baseConfig, overrideConfig) {
+  return {
+    ...baseConfig,
+    ...overrideConfig,
+    viewport: { ...(baseConfig.viewport || {}), ...(overrideConfig.viewport || {}) },
+    wait_for: { ...(baseConfig.wait_for || {}), ...(overrideConfig.wait_for || {}) },
+    route_blocklist: overrideConfig.route_blocklist || baseConfig.route_blocklist || [],
+  };
+}
+
+function buildPagePlans(args, config, configBaseDir) {
+  const defaultPageConfig = {
+    wait_until: normalizeWaitUntil(args.waitUntil),
+    timeout: args.timeout,
+    wait_for: {
+      selector: args.waitForSelector,
+      hidden_selector: args.waitForHiddenSelector,
+    },
+    route_blocklist: args.routeBlocklist,
+    viewport: args.viewport,
+    reduced_motion: args.reducedMotion,
+    screenshot: Boolean(args.screenshotDir),
+    screenshot_dir: args.screenshotDir ? resolvePath(process.cwd(), args.screenshotDir) : '',
+  };
+
+  const configuredDefaults = mergePageConfig(defaultPageConfig, config.defaults || {});
+  if (configuredDefaults.wait_until) {
+    configuredDefaults.wait_until = normalizeWaitUntil(configuredDefaults.wait_until);
+  }
+  if (configuredDefaults.viewport && (
+    typeof configuredDefaults.viewport.width !== 'number' ||
+    typeof configuredDefaults.viewport.height !== 'number'
+  )) {
+    throw new Error('Viewport config requires numeric width and height.');
+  }
+  if (!['reduce', 'no-preference'].includes(configuredDefaults.reduced_motion || 'no-preference')) {
+    throw new Error('reduced_motion must be "reduce" or "no-preference".');
+  }
+  if (configuredDefaults.screenshot_dir) {
+    configuredDefaults.screenshot_dir = resolvePath(configBaseDir, configuredDefaults.screenshot_dir);
+  }
+
+  const pagePlans = [];
+  const seenUrls = new Set();
+
+  for (const pageConfig of config.pages || []) {
+    const merged = mergePageConfig(configuredDefaults, pageConfig || {});
+    if (!merged.url) {
+      throw new Error('Each runtime page config requires a url.');
+    }
+    merged.url = String(merged.url);
+    merged.wait_until = normalizeWaitUntil(merged.wait_until);
+    merged.timeout = parseInt(merged.timeout, 10);
+    if (!Number.isFinite(merged.timeout) || merged.timeout <= 0) {
+      throw new Error(`Invalid timeout for ${merged.url}.`);
+    }
+    if (merged.screenshot_dir) {
+      merged.screenshot_dir = resolvePath(configBaseDir, merged.screenshot_dir);
+    }
+    pagePlans.push(merged);
+    seenUrls.add(merged.url);
+  }
+
+  for (const url of args.urls) {
+    if (seenUrls.has(url)) {
+      continue;
+    }
+    pagePlans.push({ ...configuredDefaults, url });
+  }
+
+  if (pagePlans.length === 0) {
+    throw new Error('Provide at least one URL via --url/--urls or config.pages[].url.');
+  }
+
+  return pagePlans;
+}
+
+function extractWcag(tags) {
+  for (const tag of tags || []) {
+    if (!/^wcag\d{3,}$/.test(tag)) {
+      continue;
+    }
+    const digits = tag.replace('wcag', '');
+    return `${digits[0]}.${digits[1]}.${digits.slice(2)}`;
+  }
+
+  return (tags || [])
+    .filter((tag) => /^wcag\d/.test(tag))
+    .map((tag) => tag.replace('wcag', ''))
+    .find((tag) => /^\d/.test(tag)) || '';
+}
+
+function stringTarget(target) {
+  return Array.isArray(target) ? target.join(' > ') : String(target || '');
+}
+
+function addScreenshot(issue, screenshotPath) {
+  if (!screenshotPath) {
+    return issue;
+  }
+  issue.fix_data.screenshot = screenshotPath;
+  return issue;
+}
+
 const AXE_TO_STATIC_RULE = {
   'image-alt': 'img-missing-alt',
   'label': 'input-missing-label',
@@ -100,37 +400,34 @@ const AXE_TO_STATIC_RULE = {
   'tabindex': 'positive-tabindex',
 };
 
-// axe impact → our triage hint. Runtime-detected contrast and computed issues
-// often need a design decision, so we lean toward "input" for contrast and
-// "auto" for clear-cut violations.
 const AXE_TRIAGE_HINT = {
-  'image-alt': 'input',        // alt text content needs human decision
-  'label': 'input',            // label text content needs human decision
-  'color-contrast': 'input',   // color choice often needs brand review
+  'image-alt': 'input',
+  'label': 'input',
+  'color-contrast': 'input',
   'html-has-lang': 'auto',
   'aria-hidden-focus': 'auto',
   'duplicate-id': 'auto',
   'tabindex': 'input',
-  'region': 'manual',          // landmark regions often need structural review
+  'region': 'manual',
   'landmark-one-main': 'manual',
   'page-has-heading-one': 'manual',
   'heading-order': 'input',
   'focus-order-semantics': 'manual',
 };
 
-function mapAxeResult(result, pageUrl) {
+function countAxeNodes(results) {
+  return (results || []).reduce((sum, item) => sum + ((item.nodes || []).length), 0);
+}
+
+function mapAxeResult(result, pageUrl, screenshotPath) {
   const issues = [];
 
-  // Violations — confirmed failures. Route by impact and rule mapping.
-  for (const violation of result.violations) {
-    for (const node of violation.nodes) {
-      issues.push({
+  for (const violation of result.violations || []) {
+    for (const node of violation.nodes || []) {
+      issues.push(addScreenshot({
         rule_id: AXE_TO_STATIC_RULE[violation.id] || violation.id,
         origin_rule_id: violation.id,
-        wcag: (violation.tags || [])
-          .filter(t => t.startsWith('wcag'))
-          .map(t => t.replace('wcag', '').match(/.{1,3}/g)?.join('.'))
-          .find(t => /^\d/.test(t)) || '',
+        wcag: extractWcag(violation.tags),
         file: pageUrl,
         line: 0,
         col: 0,
@@ -138,32 +435,26 @@ function mapAxeResult(result, pageUrl) {
         message: violation.help,
         framework: 'runtime',
         triage_hint: AXE_TRIAGE_HINT[violation.id] || (
-          violation.impact === 'critical' || violation.impact === 'serious'
-            ? 'auto' : 'input'
+          violation.impact === 'critical' || violation.impact === 'serious' ? 'auto' : 'input'
         ),
         fix_data: {
           axe_rule: violation.id,
-          impact: violation.impact,
-          target: Array.isArray(node.target) ? node.target.join(' > ') : String(node.target),
-          help_url: violation.helpUrl,
-          failure_summary: node.failureSummary,
+          impact: violation.impact || 'unknown',
+          target: stringTarget(node.target),
+          help_url: violation.helpUrl || '',
+          failure_summary: node.failureSummary || '',
           result_type: 'violation',
         },
-      });
+      }, screenshotPath));
     }
   }
 
-  // Incomplete — axe couldn't determine pass/fail. These always need a human
-  // to verify, so they route to Group 2 regardless of the rule's usual hint.
-  for (const incomplete of (result.incomplete || [])) {
-    for (const node of incomplete.nodes) {
-      issues.push({
+  for (const incomplete of result.incomplete || []) {
+    for (const node of incomplete.nodes || []) {
+      issues.push(addScreenshot({
         rule_id: AXE_TO_STATIC_RULE[incomplete.id] || incomplete.id,
         origin_rule_id: incomplete.id,
-        wcag: (incomplete.tags || [])
-          .filter(t => t.startsWith('wcag'))
-          .map(t => t.replace('wcag', '').match(/.{1,3}/g)?.join('.'))
-          .find(t => /^\d/.test(t)) || '',
+        wcag: extractWcag(incomplete.tags),
         file: pageUrl,
         line: 0,
         col: 0,
@@ -174,30 +465,118 @@ function mapAxeResult(result, pageUrl) {
         fix_data: {
           axe_rule: incomplete.id,
           impact: incomplete.impact || 'unknown',
-          target: Array.isArray(node.target) ? node.target.join(' > ') : String(node.target),
-          help_url: incomplete.helpUrl,
-          failure_summary: node.failureSummary,
+          target: stringTarget(node.target),
+          help_url: incomplete.helpUrl || '',
+          failure_summary: node.failureSummary || '',
           result_type: 'incomplete',
         },
-      });
+      }, screenshotPath));
     }
   }
 
   return issues;
 }
 
+function mapAxePasses(result, pageUrl) {
+  return (result.passes || []).map((pass) => ({
+    rule_id: AXE_TO_STATIC_RULE[pass.id] || pass.id,
+    origin_rule_id: pass.id,
+    wcag: extractWcag(pass.tags),
+    url: pageUrl,
+    node_count: (pass.nodes || []).length,
+  }));
+}
 
-// ----- Scan ----------------------------------------------------------------
-
-async function scanUrl(browser, url, opts) {
-  const page = await browser.newPage();
+function slugifyUrl(rawUrl) {
   try {
-    await page.setViewport({ width: 1280, height: 800 });
-    await page.goto(url, { waitUntil: opts.waitFor, timeout: opts.timeout });
-    await page.evaluate(axeSource);
+    const parsed = new URL(rawUrl);
+    if (parsed.protocol === 'file:') {
+      const base = path.basename(parsed.pathname).replace(path.extname(parsed.pathname), '');
+      return base || 'page';
+    }
+    const joined = `${parsed.hostname}${parsed.pathname}`.replace(/[^\w.-]+/g, '-');
+    return joined.replace(/-+/g, '-').replace(/^-|-$/g, '') || 'page';
+  } catch {
+    return String(rawUrl).replace(/[^\w.-]+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '') || 'page';
+  }
+}
+
+async function maybeCaptureScreenshot(page, pagePlan, issueCount) {
+  if (!pagePlan.screenshot_dir || !issueCount) {
+    return '';
+  }
+  fs.mkdirSync(pagePlan.screenshot_dir, { recursive: true });
+  const screenshotPath = path.resolve(pagePlan.screenshot_dir, `${slugifyUrl(pagePlan.url)}.png`);
+  await page.screenshot({ path: screenshotPath, fullPage: true });
+  return screenshotPath;
+}
+
+async function applyWaitConditions(page, pagePlan) {
+  const waitFor = pagePlan.wait_for || {};
+  const timeout = pagePlan.timeout;
+  if (waitFor.selector) {
+    await page.waitForSelector(waitFor.selector, { state: 'visible', timeout });
+  }
+  if (waitFor.hidden_selector) {
+    await page.waitForSelector(waitFor.hidden_selector, { state: 'hidden', timeout });
+  }
+  if (waitFor.load_state) {
+    await page.waitForLoadState(normalizeWaitUntil(waitFor.load_state), { timeout });
+  }
+  if (waitFor.timeout_ms) {
+    await page.waitForTimeout(parseInt(waitFor.timeout_ms, 10));
+  }
+}
+
+async function applyAuth(context, auth) {
+  if (auth.mode === 'headers') {
+    await context.setExtraHTTPHeaders(auth.headers);
+  } else if (auth.mode === 'cookies') {
+    await context.addCookies(auth.cookies);
+  }
+}
+
+async function applyRouteBlocking(page, routeBlocklist) {
+  for (const pattern of routeBlocklist || []) {
+    await page.route(pattern, (route) => route.abort());
+  }
+}
+
+async function scanPage(browser, pagePlan, auth, axeSource) {
+  const contextOptions = {
+    viewport: pagePlan.viewport || { width: 1280, height: 800 },
+    reducedMotion: pagePlan.reduced_motion || 'no-preference',
+  };
+  if (auth.mode === 'storage_state') {
+    contextOptions.storageState = auth.storageStatePath;
+  }
+
+  const context = await browser.newContext(contextOptions);
+  try {
+    await applyAuth(context, auth);
+    const page = await context.newPage();
+    await applyRouteBlocking(page, pagePlan.route_blocklist);
+
+    const response = await page.goto(pagePlan.url, {
+      waitUntil: pagePlan.wait_until,
+      timeout: pagePlan.timeout,
+    });
+    if (
+      auth.mode !== 'none' &&
+      response &&
+      (response.status() === 401 || response.status() === 403)
+    ) {
+      throw new Error(
+        `Authenticated request failed with HTTP ${response.status()}. ` +
+        'Check the auth config or refresh the stored state.'
+      );
+    }
+
+    await applyWaitConditions(page, pagePlan);
+    await page.addScriptTag({ content: axeSource });
     const result = await page.evaluate(async () => {
       /* global axe */
-      return await axe.run(document, {
+      return axe.run(document, {
         runOnly: {
           type: 'tag',
           values: [
@@ -207,35 +586,75 @@ async function scanUrl(browser, url, opts) {
             'best-practice',
           ],
         },
-        resultTypes: ['violations', 'incomplete'],
+        resultTypes: ['violations', 'incomplete', 'passes'],
       });
     });
-    return mapAxeResult(result, url);
+
+    const issueCount = countAxeNodes(result.violations) + countAxeNodes(result.incomplete);
+    const screenshotPath = await maybeCaptureScreenshot(page, pagePlan, issueCount);
+    return {
+      issues: mapAxeResult(result, pagePlan.url, screenshotPath),
+      passes: mapAxePasses(result, pagePlan.url),
+      counts: {
+        issues: issueCount,
+        violations: countAxeNodes(result.violations),
+        incomplete: countAxeNodes(result.incomplete),
+        passes: (result.passes || []).length,
+      },
+    };
   } finally {
-    await page.close();
+    await context.close();
   }
+}
+
+function formatError(err) {
+  return err && err.message ? err.message : String(err);
 }
 
 async function main() {
   const args = parseArgs(process.argv);
+  const { config, baseDir: configBaseDir } = loadConfig(args.config);
+  const auth = resolveAuth(config.auth, configBaseDir);
+  const pagePlans = buildPagePlans(args, config, configBaseDir);
 
-  const browser = await puppeteer.launch({
-    headless: 'new',
+  if (args.validateConfigOnly) {
+    console.error(`Validated runtime config for ${pagePlans.length} page(s).`);
+    return;
+  }
+
+  ensureDeps(['playwright', 'axe-core']);
+  const playwright = require('playwright');
+  ensurePlaywrightBrowser(playwright);
+  const axeSource = fs.readFileSync(require.resolve('axe-core/axe.min.js'), 'utf-8');
+
+  const browser = await playwright.chromium.launch({
+    headless: true,
     args: ['--no-sandbox', '--disable-setuid-sandbox'],
   });
 
   const allIssues = [];
-  const perUrl = {};
+  const allPasses = [];
+  const perUrlCounts = {};
+  const perUrlResultCounts = {};
   try {
-    for (const url of args.urls) {
-      console.error(`Scanning: ${url}`);
+    for (const pagePlan of pagePlans) {
+      console.error(`Scanning: ${pagePlan.url}`);
       try {
-        const issues = await scanUrl(browser, url, args);
-        perUrl[url] = issues.length;
-        allIssues.push(...issues);
+        const scan = await scanPage(browser, pagePlan, auth, axeSource);
+        perUrlCounts[pagePlan.url] = scan.issues.length;
+        perUrlResultCounts[pagePlan.url] = scan.counts;
+        allIssues.push(...scan.issues);
+        allPasses.push(...scan.passes);
       } catch (err) {
-        console.error(`  Failed: ${err.message}`);
-        perUrl[url] = `error: ${err.message}`;
+        const message = formatError(err);
+        console.error(`  Failed: ${message}`);
+        perUrlCounts[pagePlan.url] = `error: ${message}`;
+        perUrlResultCounts[pagePlan.url] = {
+          issues: 0,
+          violations: 0,
+          incomplete: 0,
+          passes: 0,
+        };
       }
     }
   } finally {
@@ -244,22 +663,27 @@ async function main() {
 
   const result = {
     scanner: 'runtime',
-    urls: args.urls,
-    per_url_counts: perUrl,
+    engine: 'playwright',
+    browser: 'chromium',
+    urls: pagePlans.map((plan) => plan.url),
+    per_url_counts: perUrlCounts,
+    per_url_result_counts: perUrlResultCounts,
     issue_count: allIssues.length,
+    pass_count: allPasses.length,
     issues: allIssues,
+    passes: allPasses,
   };
 
-  const out = JSON.stringify(result, null, 2);
+  const output = JSON.stringify(result, null, 2);
   if (args.output) {
-    fs.writeFileSync(args.output, out);
-    console.error(`Wrote ${allIssues.length} issues to ${args.output}`);
+    fs.writeFileSync(args.output, output);
+    console.error(`Wrote ${allIssues.length} runtime issues to ${args.output}`);
   } else {
-    console.log(out);
+    console.log(output);
   }
 }
 
-main().catch(err => {
-  console.error(err);
+main().catch((err) => {
+  console.error(formatError(err));
   process.exit(1);
 });

@@ -7,7 +7,7 @@ Produces a **triaged report grouped by fix autonomy** — auto-fixable, needs yo
 ## What it checks
 
 - **Static analysis** of source files (Python, no dependencies): missing `alt`, `<div onClick>`, hardcoded low-contrast colors, missing labels, `outline: none` without replacement, redundant ARIA, positive `tabindex`, `aria-hidden` on focusable elements, and more.
-- **Runtime analysis** via Puppeteer + axe-core today (Playwright migration is planned in a later milestone): computed color contrast, focus management as rendered, ARIA state after hydration, landmark regions, live regions, heading order.
+- **Runtime analysis** via Playwright + axe-core: computed color contrast, focus management as rendered, ARIA state after hydration, landmark regions, live regions, heading order, and axe incomplete results routed to manual/input review.
 - **WCAG 2.2** coverage including the new criteria: 2.4.11 Focus Appearance, 2.5.7 Dragging Movements, 2.5.8 Target Size, 3.3.7 Redundant Entry, 3.3.8 Accessible Authentication.
 
 Automated tools catch roughly 30–40% of accessibility issues. This skill is honest about that — the manual checklist covers what the scanners can't reach.
@@ -62,8 +62,11 @@ The scripts are usable directly:
 # Static scan
 python3 scripts/a11y_scan.py src/ --output /tmp/static.json
 
-# Runtime scan (auto-installs puppeteer + axe-core on first use)
+# Runtime scan (auto-installs Playwright + axe-core on first use)
 node scripts/a11y_runtime.js --url http://localhost:3000 --output /tmp/runtime.json
+
+# Runtime scan with per-page config, auth, viewport, and wait settings
+node scripts/a11y_runtime.js --config runtime.config.json --output /tmp/runtime.json
 
 # Triage into markdown plus normalized JSON
 python3 scripts/triage.py --static /tmp/static.json --runtime /tmp/runtime.json --output report.md --json-output report.json
@@ -84,6 +87,43 @@ Plus a "Not checked" section listing WCAG criteria that no automated tool can ev
 
 When `--json-output` is used, the normalized report includes deterministic `not_checked` findings, status and waiver metadata, `group_reason`, `fingerprint`, and `confirmed_by`.
 
+## Runtime config
+
+`a11y_runtime.js` accepts `--config` with JSON or YAML. Current runtime config supports:
+
+- top-level `auth`
+- top-level `defaults`
+- per-page overrides in `pages[]`
+
+Minimal auth example:
+
+```yaml
+auth:
+  mode: storage_state
+  storage_state_path: .secrets/playwright-auth.json
+```
+
+Per-page example:
+
+```yaml
+defaults:
+  wait_until: networkidle
+  timeout: 30000
+  viewport:
+    width: 1280
+    height: 800
+  reduced_motion: reduce
+  route_blocklist:
+    - "**/*.mp4"
+    - "**/analytics/**"
+pages:
+  - url: http://localhost:3000/settings
+    wait_for:
+      selector: "[role='main']"
+    screenshot: true
+    screenshot_dir: .artifacts/runtime
+```
+
 ## What this skill does NOT do
 
 - It's not a replacement for testing with real assistive technology.
@@ -98,7 +138,7 @@ a11y-audit/
 ├── README.md                             # This file
 ├── scripts/
 │   ├── a11y_scan.py                      # Static scanner (stdlib only)
-│   ├── a11y_runtime.js                   # Runtime scanner (Puppeteer + axe-core)
+│   ├── a11y_runtime.js                   # Runtime scanner (Playwright + axe-core)
 │   ├── contrast_checker.py               # WCAG contrast math
 │   └── triage.py                         # Scanner output → triaged report
 ├── references/

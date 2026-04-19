@@ -25,6 +25,7 @@ SKILL_ROOT = Path(__file__).parent.parent
 FIXTURES_ROOT = Path(__file__).parent
 SCANNER = SKILL_ROOT / "scripts" / "a11y_scan.py"
 TRIAGE = SKILL_ROOT / "scripts" / "triage.py"
+RUNTIME = SKILL_ROOT / "scripts" / "a11y_runtime.js"
 FIXED_DETECTED_AT = "2026-01-02T03:04:05Z"
 
 
@@ -111,6 +112,48 @@ def normalize_report_json(report: dict) -> dict:
     return normalized
 
 
+def normalize_runtime_output(runtime_output: dict, fixture_name: str) -> dict:
+    fixture_url = Path(FIXTURES_ROOT / fixture_name / "index.html").resolve().as_uri()
+
+    def normalize_url(value: str) -> str:
+        if value == fixture_url:
+            return f"file://fixtures/{fixture_name}/index.html"
+        return value
+
+    def normalize_screenshot(value: str) -> str:
+        if not value:
+            return ""
+        screenshot_path = Path(value)
+        if not screenshot_path.is_absolute():
+            return value
+        parent = screenshot_path.parent.name
+        if parent:
+            return f"{parent}/{screenshot_path.name}"
+        return screenshot_path.name
+
+    out = {
+        "scanner": runtime_output["scanner"],
+        "engine": runtime_output.get("engine", ""),
+        "browser": runtime_output.get("browser", ""),
+        "issue_count": runtime_output["issue_count"],
+        "has_passes": runtime_output.get("pass_count", 0) > 0,
+        "issues": [],
+    }
+    for issue in runtime_output.get("issues", []):
+        out["issues"].append({
+            "rule_id": issue["rule_id"],
+            "origin_rule_id": issue.get("origin_rule_id", ""),
+            "wcag": issue["wcag"],
+            "file": normalize_url(issue["file"]),
+            "triage_hint": issue["triage_hint"],
+            "result_type": issue.get("fix_data", {}).get("result_type", ""),
+            "target": issue.get("fix_data", {}).get("target", ""),
+            "screenshot": normalize_screenshot(issue.get("fix_data", {}).get("screenshot", "")),
+        })
+    out["issues"].sort(key=lambda item: (item["rule_id"], item["file"], item["target"]))
+    return out
+
+
 def run_static_fixture(fixture_dir: Path, update: bool = False) -> bool:
     """Returns True if the static fixture passes (or was updated), False on failure."""
     name = fixture_dir.name
@@ -158,6 +201,85 @@ def run_static_fixture(fixture_dir: Path, update: bool = False) -> bool:
         print(f"        missing:  {k[0]} at {k[1]}:{k[2]}")
     for k in extra:
         print(f"        extra:    {k[0]} at {k[1]}:{k[2]}")
+    return False
+
+
+def run_runtime_smoke_fixture(fixture_dir: Path, update: bool = False) -> bool:
+    name = fixture_dir.name
+    expected_path = fixture_dir / "expected.runtime.json"
+    output_path = Path("/tmp/runtime-actual.json")
+    screenshot_dir = Path("/tmp/runtime-screenshots")
+    html_path = fixture_dir / "index.html"
+    config_path = fixture_dir / "runtime.config.json"
+
+    cmd = [
+        "node",
+        str(RUNTIME),
+        "--url",
+        html_path.resolve().as_uri(),
+        "--output",
+        str(output_path),
+    ]
+    if config_path.exists():
+        cmd.extend(["--config", str(config_path)])
+    if screenshot_dir:
+        cmd.extend(["--screenshot-dir", str(screenshot_dir)])
+
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    if result.returncode != 0:
+        print(f"  FAIL {name}: runtime scan exited {result.returncode}")
+        print(f"        stderr: {result.stderr.strip()}")
+        return False
+
+    actual = normalize_runtime_output(json.loads(output_path.read_text()), name)
+
+    if update:
+        expected_path.write_text(json.dumps(actual, indent=2) + "\n")
+        print(f"  UPDATED {name}: runtime snapshot refreshed")
+        return True
+
+    if not expected_path.exists():
+        print(f"  FAIL {name}: no expected.runtime.json found (run with --update to create)")
+        return False
+
+    expected = json.loads(expected_path.read_text())
+    if actual == expected:
+        print(f"  PASS {name}: runtime scan matched snapshot")
+        return True
+
+    print(f"  FAIL {name}: runtime scan differed from expected.runtime.json")
+    return False
+
+
+def run_runtime_error_fixture(fixture_dir: Path) -> bool:
+    name = fixture_dir.name
+    expected_path = fixture_dir / "expected.error.txt"
+    config_path = fixture_dir / "runtime.config.json"
+
+    cmd = [
+        "node",
+        str(RUNTIME),
+        "--url",
+        "http://localhost.invalid",
+        "--config",
+        str(config_path),
+    ]
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    stderr = result.stderr.strip()
+
+    if result.returncode == 0:
+        print(f"  FAIL {name}: expected runtime command to fail")
+        return False
+    if not expected_path.exists():
+        print(f"  FAIL {name}: no expected.error.txt found")
+        return False
+
+    expected = expected_path.read_text().strip()
+    if stderr == expected:
+        print(f"  PASS {name}: runtime error matched expected redacted message")
+        return True
+
+    print(f"  FAIL {name}: runtime error differed from expected.error.txt")
     return False
 
 
@@ -230,6 +352,10 @@ def run_triage_fixture(fixture_dir: Path, update: bool = False) -> bool:
 
 def run_fixture(fixture_dir: Path, update: bool = False) -> bool:
     """Returns True if the fixture passes (or was updated), False on failure."""
+    if (fixture_dir / "expected.runtime.json").exists():
+        return run_runtime_smoke_fixture(fixture_dir, update=update)
+    if (fixture_dir / "expected.error.txt").exists():
+        return run_runtime_error_fixture(fixture_dir)
     if (fixture_dir / "runtime.json").exists() or (fixture_dir / "static.json").exists():
         return run_triage_fixture(fixture_dir, update=update)
     return run_static_fixture(fixture_dir, update=update)
@@ -241,6 +367,8 @@ def main():
                         help="Regenerate expected.json snapshots instead of comparing")
     parser.add_argument("--only", type=str, default=None,
                         help="Run only the named fixture")
+    parser.add_argument("--live-runtime", action="store_true",
+                        help="Include live Playwright runtime smoke fixtures")
     args = parser.parse_args()
 
     fixtures = sorted(
@@ -250,6 +378,8 @@ def main():
             or (d / "expected.json").exists()
             or (d / "expected.md").exists()
             or (d / "expected.report.json").exists()
+            or (d / "expected.error.txt").exists()
+            or (args.live_runtime and (d / "expected.runtime.json").exists())
         )
     )
     if args.only:

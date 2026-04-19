@@ -50,7 +50,13 @@ Fast, catches source-visible issues: missing `alt`, `<div onClick>`, hardcoded l
 ```bash
 node scripts/a11y_runtime.js --url <url> --output /tmp/a11y-runtime.json
 ```
-Uses Puppeteer + axe-core to analyze the rendered DOM. Catches computed contrast, focus management, rendered ARIA states, semantic structure after hydration. Auto-installs `puppeteer` and `axe-core` on first run.
+Uses Playwright + axe-core to analyze the rendered DOM. Catches computed contrast, focus management, rendered ARIA states, semantic structure after hydration, and axe-incomplete findings that need manual verification. Auto-installs `playwright` and `axe-core` on first run.
+
+For authenticated or configured scans, use:
+```bash
+node scripts/a11y_runtime.js --config runtime.config.json --output /tmp/a11y-runtime.json
+```
+The runtime config supports storage-state auth, headers/cookies auth, per-page wait conditions, route blocking, viewport, reduced motion, and optional screenshots.
 
 **If the user gives a URL, run both.** Static tells you where to fix in the source; runtime confirms what the real DOM produces. If the user only gives a directory, run static only and note in the report that runtime checks weren't performed.
 
