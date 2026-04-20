@@ -16,9 +16,11 @@ To update snapshots after an intentional scanner change:
 import argparse
 import json
 import re
+import shutil
 import subprocess
 import sys
 from pathlib import Path
+from typing import Dict, Optional
 
 
 SKILL_ROOT = Path(__file__).parent.parent
@@ -61,7 +63,47 @@ def normalize_report(report: str) -> str:
     return normalized.rstrip()
 
 
-def normalize_report_json(report: dict) -> dict:
+def _fixture_text_root(fixture_name: str) -> str:
+    return f"fixtures/{fixture_name}"
+
+
+def normalize_fixture_value(value, fixture_name: str, path_aliases: Optional[Dict[str, str]] = None):
+    fixture_dir = (FIXTURES_ROOT / fixture_name).resolve()
+    fixture_root = _fixture_text_root(fixture_name)
+    fixture_uri = fixture_dir.as_uri()
+    path_aliases = path_aliases or {}
+
+    if isinstance(value, str):
+        normalized = value.replace(str(fixture_dir), fixture_root)
+        normalized = normalized.replace(str(fixture_dir).replace("\\", "/"), fixture_root)
+        if value.startswith(fixture_uri):
+            normalized = normalized.replace(fixture_uri, f"file://{fixture_root}")
+        for source, target in sorted(path_aliases.items(), key=lambda item: len(item[0]), reverse=True):
+            normalized = normalized.replace(source, target)
+            normalized = normalized.replace(source.replace("\\", "/"), target)
+        return normalized
+    if isinstance(value, list):
+        return [normalize_fixture_value(item, fixture_name, path_aliases=path_aliases) for item in value]
+    if isinstance(value, dict):
+        return {
+            key: normalize_fixture_value(item, fixture_name, path_aliases=path_aliases)
+            for key, item in value.items()
+        }
+    return value
+
+
+def _audit_output_aliases(fixture_name: str, output_dir: Path) -> Dict[str, str]:
+    alias_root = f"artifacts/{fixture_name}-audit-output"
+    aliases = {
+        str(output_dir): alias_root,
+        str(output_dir.resolve()): alias_root,
+    }
+    aliases[output_dir.as_uri()] = f"file://{alias_root}"
+    aliases[output_dir.resolve().as_uri()] = f"file://{alias_root}"
+    return aliases
+
+
+def normalize_report_json(report: dict, fixture_name: Optional[str] = None) -> dict:
     """Keep comparisons deterministic and compact across environments."""
     normalized = {
         "schema_version": report["schema_version"],
@@ -120,6 +162,8 @@ def normalize_report_json(report: dict) -> dict:
             compact["origin_rule_id"] = finding["origin_rule_id"]
         normalized["findings"].append(compact)
 
+    if fixture_name:
+        normalized = normalize_fixture_value(normalized, fixture_name)
     return normalized
 
 
@@ -601,8 +645,131 @@ def run_cli_fixture(fixture_dir: Path, update: bool = False) -> bool:
     return ok
 
 
+def run_audit_fixture(fixture_dir: Path, update: bool = False) -> bool:
+    name = fixture_dir.name
+    spec_path = fixture_dir / "audit.fixture.json"
+    expected_stdout_path = fixture_dir / "expected.stdout.txt"
+    expected_markdown_path = fixture_dir / "expected.md"
+    expected_summary_path = fixture_dir / "expected.summary.md"
+    expected_json_path = fixture_dir / "expected.report.json"
+    expected_manifest_path = fixture_dir / "expected.manifest.json"
+    output_dir = Path("/tmp") / f"{name}-audit-output"
+
+    if output_dir.exists():
+        shutil.rmtree(output_dir)
+
+    spec = json.loads(spec_path.read_text(encoding="utf-8"))
+    cmd = [
+        sys.executable,
+        str(CLI),
+        "audit",
+        "--output-dir",
+        str(output_dir),
+        "--detected-at",
+        FIXED_DETECTED_AT,
+        "--mode",
+        spec.get("mode", "quick"),
+    ]
+
+    path_value = spec.get("path")
+    if path_value:
+        cmd.extend(["--path", str((fixture_dir / path_value).resolve())])
+    url_value = spec.get("url")
+    if url_value:
+        cmd.extend(["--url", url_value])
+    framework_value = spec.get("framework")
+    if framework_value:
+        cmd.extend(["--framework", framework_value])
+    runtime_config = spec.get("runtime_config")
+    if runtime_config:
+        cmd.extend(["--runtime-config", str((fixture_dir / runtime_config).resolve())])
+    journey_config = spec.get("journey_config")
+    if journey_config:
+        cmd.extend(["--journey-config", str((fixture_dir / journey_config).resolve())])
+    token_file = spec.get("token_file")
+    if token_file:
+        cmd.extend(["--token-file", str((fixture_dir / token_file).resolve())])
+    baseline_file = spec.get("baseline_file")
+    if baseline_file:
+        cmd.extend(["--baseline-file", str((fixture_dir / baseline_file).resolve())])
+    status_file = spec.get("status_file")
+    if status_file:
+        cmd.extend(["--status-file", str((fixture_dir / status_file).resolve())])
+
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    if result.returncode != 0:
+        print(f"  FAIL {name}: audit command exited {result.returncode}")
+        print(f"        stderr: {result.stderr.strip()}")
+        return False
+
+    path_aliases = _audit_output_aliases(name, output_dir)
+    actual_stdout = normalize_fixture_value(result.stdout.strip(), name, path_aliases=path_aliases)
+    actual_markdown = normalize_fixture_value(
+        normalize_report((output_dir / "report.md").read_text(encoding="utf-8")),
+        name,
+        path_aliases=path_aliases,
+    )
+    actual_summary = normalize_fixture_value(
+        normalize_report((output_dir / "summary.md").read_text(encoding="utf-8")),
+        name,
+        path_aliases=path_aliases,
+    )
+    actual_json = normalize_report_json(
+        json.loads((output_dir / "report.json").read_text(encoding="utf-8")),
+        fixture_name=name,
+    )
+    actual_manifest = normalize_fixture_value(
+        json.loads((output_dir / "manifest.json").read_text(encoding="utf-8")),
+        name,
+        path_aliases=path_aliases,
+    )
+
+    if update:
+        expected_stdout_path.write_text(actual_stdout + "\n", encoding="utf-8")
+        expected_markdown_path.write_text(actual_markdown + "\n", encoding="utf-8")
+        expected_summary_path.write_text(actual_summary + "\n", encoding="utf-8")
+        expected_json_path.write_text(json.dumps(actual_json, indent=2) + "\n", encoding="utf-8")
+        expected_manifest_path.write_text(json.dumps(actual_manifest, indent=2) + "\n", encoding="utf-8")
+        print(f"  UPDATED {name}: audit package snapshots refreshed")
+        shutil.rmtree(output_dir)
+        return True
+
+    ok = True
+    checks = [
+        ("stdout", expected_stdout_path, actual_stdout),
+        ("report markdown", expected_markdown_path, actual_markdown),
+        ("summary markdown", expected_summary_path, actual_summary),
+    ]
+    for label, path, actual in checks:
+        expected = path.read_text(encoding="utf-8").strip()
+        if actual == expected:
+            print(f"  PASS {name}: {label} matched snapshot")
+        else:
+            print(f"  FAIL {name}: {label} differed from {path.name}")
+            ok = False
+
+    expected_json = json.loads(expected_json_path.read_text(encoding="utf-8"))
+    if actual_json == expected_json:
+        print(f"  PASS {name}: report JSON matched snapshot")
+    else:
+        print(f"  FAIL {name}: report JSON differed from {expected_json_path.name}")
+        ok = False
+
+    expected_manifest = json.loads(expected_manifest_path.read_text(encoding="utf-8"))
+    if actual_manifest == expected_manifest:
+        print(f"  PASS {name}: manifest matched snapshot")
+    else:
+        print(f"  FAIL {name}: manifest differed from {expected_manifest_path.name}")
+        ok = False
+
+    shutil.rmtree(output_dir)
+    return ok
+
+
 def run_fixture(fixture_dir: Path, update: bool = False) -> bool:
     """Returns True if the fixture passes (or was updated), False on failure."""
+    if (fixture_dir / "audit.fixture.json").exists():
+        return run_audit_fixture(fixture_dir, update=update)
     if (fixture_dir / "cli.fixture").exists() or (fixture_dir / "expected.summary.md").exists() or (fixture_dir / "expected.exit.txt").exists():
         return run_cli_fixture(fixture_dir, update=update)
     if (fixture_dir / "expected.stateful.json").exists():
@@ -639,6 +806,8 @@ def main():
             or (d / "expected.md").exists()
             or (d / "expected.report.json").exists()
             or (d / "expected.summary.md").exists()
+            or (d / "expected.manifest.json").exists()
+            or (d / "expected.stdout.txt").exists()
             or (d / "expected.exit.txt").exists()
             or (d / "expected.error.txt").exists()
             or (args.live_runtime and ((d / "expected.runtime.json").exists() or (d / "expected.stateful.json").exists()))
