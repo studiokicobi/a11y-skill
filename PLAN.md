@@ -31,6 +31,7 @@ This file is the execution plan for the repo.
 - M5 — Baselines, fingerprints, and waivers
 - M6 — Token and design-system analysis
 - M7 — Source mapping and CI/PR integration
+- M8 — Unified audit UX and report packaging
 
 ---
 
@@ -324,6 +325,55 @@ Add explainable source mapping and CI-ready output behavior.
 ### Done when
 - CI mode is deterministic
 - runtime findings can map back to likely source with explainable confidence
+
+---
+
+## M8 — Unified audit UX and report packaging
+
+### Goal
+Make the tool feel like one product with a clear operator workflow instead of a set of loosely related scripts.
+
+This milestone is defined in more detail by `docs/post-m7-operator-ux.md`.
+
+### In scope
+- single public command surface for local audits and CI
+- one artifact directory per run
+- clearer markdown and PR-summary handoff
+- no new scanner rules
+- no new source-mapping techniques
+
+### Tasks
+- Define `cli.py audit` as the primary public audit entrypoint.
+- Define `cli.py ci` as the primary CI/PR entrypoint.
+- Keep lower-level scripts supported for fixtures and development, but move them out of the default user workflow.
+- Standardize run artifacts under one output directory:
+  - `report.md`
+  - `report.json`
+  - `summary.md`
+  - `manifest.json`
+  - copied input configs where present
+  - scanner JSON and screenshots under predictable subdirectories
+- Add a mandatory `Next steps` block near the top of the markdown report.
+- Add an artifact index near the top of the markdown report.
+- Make the PR summary explicitly state:
+  - scope
+  - blockers
+  - groups
+  - why a finding is blocking
+  - when findings were excluded because mapping confidence was too low
+- Document the new public workflow in `docs/trd.md`, `README.md`, and `SKILL.md`.
+
+### Required fixtures/tests
+- audit mode writes expected artifact layout
+- audit mode quick-vs-full summary text
+- markdown report includes `Next steps`
+- PR summary includes threshold and blocker rationale
+- changed-files summary notes excluded low-confidence findings
+
+### Done when
+- a first-time user can run one command and find the resulting artifacts without reading the internals
+- the report tells the user exactly what action to take next
+- public docs describe `audit` and `ci` as the supported workflow entrypoints
 
 ---
 
