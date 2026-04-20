@@ -1,0 +1,3 @@
+.agents/skills/a11y-audit/.a11y-audit-deps/
+.agents/skills/a11y-audit/scripts/__pycache__/
+a11y-audit.skill
