@@ -306,7 +306,7 @@ The `not_checked` group must be populated from a fixed, declared list maintained
 
 * the skill ships a `references/wcag_coverage.md` listing every WCAG 2.2 Level A and AA criterion and marking each as `static | runtime | stateful | manual-template | out-of-scope`
 * criteria marked `out-of-scope` (for example 1.2.* time-based media, 2.3.1 seizure thresholds, 3.1.3 reading level) always appear in the `not_checked` group regardless of what ran
-* criteria marked `manual-template` that were not included in the run's manual checklist also appear in `not_checked`
+* criteria marked `manual-template` that were not included in the run's guided checklist also appear in `not_checked`
 * criteria that were attempted but returned axe `incomplete` go to `needs_input`, not `not_checked`
 
 #### Classification inputs
@@ -593,13 +593,16 @@ Schema conventions:
 
 Must include:
 
+* one-line outcome summary
 * target and scan metadata
+* artifact index with paths to generated outputs
+* explicit "What to do next" block near the top of the report
 * coverage summary
-* grouped findings by fix autonomy
+* grouped findings by the named fix-autonomy buckets: Safe to fix now, Needs your decision, Test it yourself
 * issue counts by source and confidence
 * actionable diffs for safe fixes
 * decision prompts for input-required items
-* guided manual checklist
+* guided checklist
 * not-checked section
 * regression summary when baseline is present
 
@@ -613,16 +616,96 @@ Must include all normalized findings, scanner metadata, baseline comparison, and
 * DOM snapshots
 * focus-order log
 * generated Playwright state checkpoints
+* copied runtime/journey/token config inputs used for the run
+* manifest file describing the run, generated artifacts, and selected modes
+
+### Report package layout
+
+The default audit output should be one directory per run, not a loose collection of `/tmp` files.
+
+Default layout:
+
+```text
+.artifacts/a11y/<run-id>/
+  manifest.json
+  report.md
+  report.json
+  summary.md
+  scanners/
+    static.json
+    runtime.json
+    stateful.json
+    tokens.json
+  evidence/
+    screenshots/
+    dom/
+    focus/
+  inputs/
+    runtime.config.json
+    journey.config.json
+    changed-files.txt
+```
+
+Requirements:
+
+* the tool must print the final output directory at the end of the run
+* if a scanner did not run, its artifact may be omitted from the package
+* screenshot and evidence paths in reports remain relative to the report output directory
+* `manifest.json` records the target, modes used, generated-at timestamp, and the relative paths of emitted artifacts
 
 ---
 
 ## 9. Modes
 
+### Public command surface
+
+The tool should expose two public workflows only:
+
+1. `audit` — operator-facing local audit workflow
+2. `ci` — non-interactive regression and PR workflow
+
+The concrete post-M7 UX target for these workflows is documented in `docs/post-m7-operator-ux.md`.
+
+Lower-level scripts (`a11y_scan.py`, `a11y_runtime.js`, `a11y_stateful.js`, `tokens.py`, `triage.py`, `report.py`, `baseline.py`) remain supported as internal building blocks for fixtures, debugging, and advanced usage, but the default docs and agent workflow should point to the public commands above.
+
+Exact command UX target:
+
+```bash
+# Quick local audit
+python3 scripts/cli.py audit --path src/
+
+# Full local audit with runtime target and saved artifacts
+python3 scripts/cli.py audit \
+  --path . \
+  --url http://localhost:3000 \
+  --mode full \
+  --output-dir .artifacts/a11y/latest
+
+# CI/PR audit with baseline and changed-files scope
+python3 scripts/cli.py ci \
+  --path . \
+  --url http://localhost:3000 \
+  --baseline-file .a11y/baseline.json \
+  --changed-files .a11y/changed-files.txt \
+  --output-dir .artifacts/a11y/ci \
+  --ci
+```
+
+Public-command requirements:
+
+* `audit` chooses the relevant scanners from the supplied path, URL, and optional configs
+* `audit` writes the full artifact package and prints a concise human summary plus where to find the outputs
+* `ci` writes a compact PR/CI summary and returns deterministic exit codes
+* `ci` may reuse existing normalized reports internally, but the public UX should not require the user to know the intermediate scripts
+* remediation is a continuation of `audit`, not a separate mandatory public CLI mode
+* `--mode quick|full` is the only top-level audit-depth switch exposed by default docs
+* baseline creation and update must be available from the public flow without requiring hand-editing JSON
+
 ### Mode 1 — Quick audit
 
 * static scan
 * runtime scan on one entry page
-* short manual checklist
+* guided checks for the current target
 * no journeys
 
 ### Mode 2 — Full audit
@@ -630,7 +713,7 @@ Must include all normalized findings, scanner metadata, baseline comparison, and
 * static scan
 * runtime scan across configured pages
 * stateful journeys
-* full manual checklist
+* full guided checklist coverage for the current target
 * token analysis
 * baseline comparison
 
@@ -784,7 +867,7 @@ Need fixtures for:
 
 ### Quick audit target
 
-* complete under 30 seconds on a **small project** (static scan + single runtime page + short manual checklist)
+* complete under 30 seconds on a **small project** (static scan + single runtime page + guided checks for the current target)
 * the 30-second target excludes cold browser installation; first-run Playwright install is measured and reported separately
 
 ### Full audit target
@@ -903,7 +986,7 @@ The current v0.2 skill already implements part of this TRD. This table gives imp
 | A. Static Source Analysis | **Built** — 12 rules, whole-file scanning, Python stdlib only, multi-framework patterns including Angular `(click)=` and Svelte `on:click=` | Add `origin_rule_id` field; add wrapped-label detection; add duplicate-id rule; add icon-only-control rule; add stable-anchor extraction for fingerprinting |
 | B. Runtime DOM Analysis | **Built on Puppeteer** — axe-core integration, violation + incomplete result processing, `wcag2a/aa/21a/21aa/22a/22aa/best-practice` tag set | Rewrite on Playwright; add heading-order rule routing; add auth config support; add scoped-region scanning; add per-page configuration |
 | C. Stateful Interaction Audits | **Not built** | Full implementation: journey config parser, step executor, per-checkpoint axe runs, focus transition recording, `journey_step_id` propagation |
-| D. Assisted Manual Review | **Partial** — static manual checklist exists in triage output | Generate checklist from page type and detected components rather than a fixed template; mark required capability (browser / keyboard / screen reader / visual) per item |
+| D. Assisted Manual Review | **Partial** — static guided checklist exists in triage output | Generate checklist from page type and detected components rather than a fixed template; mark required capability (browser / keyboard / screen reader / visual) per item |
 | E. Fix-Autonomy Triage | **Built** — four groups, safety levels, scanner-origin classification, cross-scanner dedup with `confirmed_by` flag | Add `status` and `waiver` handling; add "not checked" population from fixed WCAG coverage list; add reason-for-group-assignment field |
 | F. Source Mapping | **Not built** | Phase 4; start with source maps and component stack traces only |
 | G. Token Analysis | **Partial** — contrast checker script exists for hex and Tailwind classes | Add theme file parsing; expand to focus-indicator and color-only semantic checks; add blast-radius reporting |

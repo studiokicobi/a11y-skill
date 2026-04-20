@@ -25,11 +25,13 @@ Treat `a11y-audit.skill` as a distributable artifact, not the file to edit direc
 
 ## Commands
 - Run fixture runner from repo root: `python3 .agents/skills/a11y-audit/fixtures/run_fixtures.py`
+- Run a public audit smoke test: `python3 .agents/skills/a11y-audit/scripts/cli.py audit --path .agents/skills/a11y-audit/fixtures/html-basic --output-dir /tmp/a11y-audit-smoke --detected-at 2026-01-02T03:04:05Z`
+- Run a public CI smoke test: `python3 .agents/skills/a11y-audit/scripts/cli.py ci --runtime .agents/skills/a11y-audit/fixtures/ci-changed-files-blocking/runtime.json --changed-files .agents/skills/a11y-audit/fixtures/ci-changed-files-blocking/changed-files.txt --output-dir /tmp/a11y-ci-smoke --detected-at 2026-01-02T03:04:05Z --ci`
 - Run a static scanner smoke test: `python3 .agents/skills/a11y-audit/scripts/a11y_scan.py .agents/skills/a11y-audit/fixtures/html-basic --quiet --output /tmp/a11y-static.json`
 - Run a token scanner smoke test: `python3 .agents/skills/a11y-audit/scripts/tokens.py .agents/skills/a11y-audit/fixtures/token-contrast/tokens.json --output /tmp/a11y-tokens.json`
 - Build a baseline from a normalized JSON report: `python3 .agents/skills/a11y-audit/scripts/baseline.py --report /tmp/a11y-report.json --output /tmp/a11y-baseline.json`
 - Compare a scan against a saved baseline: `python3 .agents/skills/a11y-audit/scripts/triage.py --static /tmp/a11y-static.json --tokens /tmp/a11y-tokens.json --json-output /tmp/a11y-report.json --baseline-file /tmp/a11y-baseline.json`
-- Render a CI/PR summary and exit with CI codes: `python3 .agents/skills/a11y-audit/scripts/cli.py --runtime /tmp/a11y-runtime.json --baseline-file /tmp/a11y-baseline.json --pr-summary-output /tmp/a11y-pr-summary.md --ci`
+- Render a CI/PR summary and exit with CI codes from raw scanner JSON: `python3 .agents/skills/a11y-audit/scripts/cli.py --runtime /tmp/a11y-runtime.json --baseline-file /tmp/a11y-baseline.json --pr-summary-output /tmp/a11y-pr-summary.md --ci`
 - Render a PR summary from an existing normalized report: `python3 .agents/skills/a11y-audit/scripts/report.py --report /tmp/a11y-report.json --summary-output /tmp/a11y-pr-summary.md --ci`
 - Run a runtime script syntax check: `node --check .agents/skills/a11y-audit/scripts/a11y_runtime.js`
 - Run a stateful script syntax check: `node --check .agents/skills/a11y-audit/scripts/a11y_stateful.js`
@@ -37,6 +39,7 @@ Treat `a11y-audit.skill` as a distributable artifact, not the file to edit direc
 - There is no configured repo-level `pytest` or `ruff` workflow yet.
 
 ## Reporting expectations
+- Use named buckets (Safe to fix now / Needs your decision / Test it yourself) in user-facing text. Numbered group labels are not used.
 - Reports must group findings into:
   1. auto-fixable
   2. needs input

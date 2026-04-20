@@ -1,0 +1,63 @@
+{
+  "run_id": "audit-quick-static-audit-output",
+  "run_kind": "audit",
+  "mode": "quick",
+  "generated_at": "2026-01-02T03:04:05Z",
+  "target": "fixtures/audit-quick-static/source",
+  "framework": "html",
+  "summary": {
+    "scanner_detected_issue_count": 1,
+    "auto_fixable_count": 0,
+    "needs_input_count": 1,
+    "manual_review_count": 0,
+    "waived_count": 0,
+    "not_checked_count": 9,
+    "by_scanner": {
+      "static": 1,
+      "runtime": 0,
+      "stateful": 0,
+      "manual-template": 0,
+      "token": 0
+    },
+    "by_confidence": {
+      "high": 1,
+      "medium": 0,
+      "low": 0
+    },
+    "status_counts": {
+      "open": 1,
+      "waived": 0,
+      "fixed": 0,
+      "resolved": 0,
+      "stale": 0
+    }
+  },
+  "baseline_comparison": {
+    "baseline_present": false,
+    "baseline_generated_at": "",
+    "summary": {
+      "new": 0,
+      "unchanged": 0,
+      "fixed": 0,
+      "resolved": 0,
+      "stale": 0,
+      "waived": 0
+    }
+  },
+  "scope_metadata": {
+    "excluded_total_count": 0,
+    "excluded_low_confidence_count": 0
+  },
+  "artifacts": {
+    "report_markdown": "report.md",
+    "report_json": "report.json",
+    "summary_markdown": "summary.md",
+    "scanner_outputs": {
+      "static": "scanners/static.json"
+    }
+  },
+  "inputs": {},
+  "scanners_ran": [
+    "static"
+  ]
+}

@@ -1504,7 +1504,7 @@ def generate_manual_review_items(report: dict, stateful_data: Optional[dict]) ->
     return items
 
 
-def _render_manual_checklist(items: List[dict], step_failures: List[dict]) -> List[str]:
+def _render_guided_checklist(items: List[dict], step_failures: List[dict]) -> List[str]:
     lines = []
     if step_failures:
         lines.append("Recorded journey step failures:")
@@ -1514,10 +1514,8 @@ def _render_manual_checklist(items: List[dict], step_failures: List[dict]) -> Li
             )
         lines.append("")
 
-    lines.append("Assisted checks:")
-    lines.append("")
     for index, item in enumerate(items, start=1):
-        lines.append(f"### {index}. {item['title']}")
+        lines.append(f"#### {index}. {item['title']}")
         lines.append(f"**Capability**: `{item['capability']}`")
         lines.append(f"**WCAG**: {', '.join(item['wcag'])}")
         lines.append(f"**Context**: {item['context']}")
@@ -1566,8 +1564,186 @@ def _blast_radius_value(finding: dict) -> str:
         return str(blast_radius.get("summary", "") or "")
     return ""
 
+def _snapshot_lines(report: dict, render_context: Optional[dict]) -> List[str]:
+    render_context = render_context or {}
+    scanners_ran = list(render_context.get("scanners_ran", []))
+    artifact_paths = list(render_context.get("artifact_paths", []))
+    excluded_low_confidence_count = int(render_context.get("excluded_low_confidence_count", 0) or 0)
 
-def build_markdown_report(report: dict, message_lookup: Dict[str, str], manual_items: List[dict], step_failures: List[dict]) -> str:
+    lines = [
+        "## Snapshot",
+        f"- Target: {report['target']}",
+        f"- Framework: {report['framework']}",
+        f"- Standard: {report['standard']}",
+    ]
+    mode = str(render_context.get("mode", "") or "").strip()
+    if mode:
+        lines.append(f"- Mode: {mode}")
+    if scanners_ran:
+        lines.append(f"- Checked: {', '.join(scanners_ran)}")
+
+    by_scanner = report["summary"].get("by_scanner", {})
+    scanner_parts = [
+        f"{scanner} {count}"
+        for scanner, count in by_scanner.items()
+        if count
+    ]
+    if scanner_parts:
+        lines.append(f"- Findings by source: {', '.join(scanner_parts)}")
+
+    baseline_comparison = report.get("baseline_comparison", {})
+    if baseline_comparison.get("baseline_present"):
+        baseline_parts = [
+            f"{name} {count}"
+            for name, count in baseline_comparison.get("summary", {}).items()
+            if count
+        ]
+        lines.append(f"- Baseline: {', '.join(baseline_parts) if baseline_parts else 'present'}")
+    else:
+        lines.append("- Baseline: none")
+
+    by_confidence = report["summary"].get("by_confidence", {})
+    confidence_parts = [
+        f"{confidence} {count}"
+        for confidence, count in by_confidence.items()
+        if count
+    ]
+    if confidence_parts:
+        lines.append(f"- Confidence: {', '.join(confidence_parts)}")
+
+    if excluded_low_confidence_count:
+        label = "finding" if excluded_low_confidence_count == 1 else "findings"
+        lines.append(
+            f"- Excluded from changed-files scope: {excluded_low_confidence_count} {label} with low-confidence mapping"
+        )
+
+    if artifact_paths:
+        lines.append("Artifacts:")
+        for artifact in artifact_paths:
+            lines.append(f"- `{artifact}`")
+
+    lines.append("")
+    return lines
+
+
+def _format_outcome_count(value: int, markdown: bool) -> str:
+    return f"**{value}**" if markdown else str(value)
+
+
+def _baseline_chat_verb(baseline_present: bool) -> str:
+    return "update the baseline" if baseline_present else "save the baseline"
+
+
+def build_outcome_summary(report: dict, manual_items: List[dict], markdown: bool = False) -> dict:
+    summary = report.get("summary", {})
+    auto_count = int(summary.get("auto_fixable_count", 0) or 0)
+    input_count = int(summary.get("needs_input_count", 0) or 0)
+    manual_review_count = int(summary.get("manual_review_count", 0) or 0)
+    guided_check_count = len(manual_items)
+    active_finding_count = int(summary.get("scanner_detected_issue_count", 0) or 0)
+    baseline_present = bool(report.get("baseline_comparison", {}).get("baseline_present"))
+    count = lambda value: _format_outcome_count(value, markdown)
+
+    if active_finding_count > 0:
+        body = (
+            f"Found {count(active_finding_count)} active findings: "
+            f"{count(auto_count)} safe to fix now, "
+            f"{count(input_count)} need your decision"
+        )
+        if manual_review_count > 0:
+            body += f", {count(manual_review_count)} to review manually"
+        body += "."
+        if guided_check_count > 0:
+            body += f" Also generated {count(guided_check_count)} guided checks for this target."
+    elif guided_check_count == 0 and not baseline_present:
+        body = 'No active findings. Say "save the baseline" to lock this clean run in as the regression reference.'
+    elif guided_check_count == 0 and baseline_present:
+        body = 'No active findings. Say "update the baseline" to refresh the regression reference with this clean run.'
+    elif not baseline_present:
+        body = (
+            f'No active findings. Generated {count(guided_check_count)} guided checks for this target '
+            '— say "give me the checklist" to walk through them, or "save the baseline" to lock this clean run in.'
+        )
+    else:
+        body = (
+            f'No active findings. Generated {count(guided_check_count)} guided checks for this target '
+            '— say "give me the checklist" to walk through them, or "update the baseline" to refresh it.'
+        )
+
+    return {
+        "active_finding_count": active_finding_count,
+        "auto_count": auto_count,
+        "input_count": input_count,
+        "manual_review_count": manual_review_count,
+        "guided_check_count": guided_check_count,
+        "baseline_present": baseline_present,
+        "baseline_verb": _baseline_chat_verb(baseline_present),
+        "outcome_body": body,
+    }
+
+
+def _test_it_yourself_variant(manual_review_count: int, guided_check_count: int) -> Optional[str]:
+    if manual_review_count > 0 and guided_check_count > 0:
+        return (
+            f'say "give me the checklist" — covers {manual_review_count} scanner-flagged findings to verify '
+            f'and {guided_check_count} guided checks. Or say "show me the manual findings" for just the '
+            "scanner-flagged items."
+        )
+    if manual_review_count > 0:
+        return (
+            f'say "show me the manual findings" — {manual_review_count} item'
+            f'{"s" if manual_review_count != 1 else ""} the scanner flagged but a human must verify.'
+        )
+    if guided_check_count > 0:
+        return f'say "give me the checklist" — {guided_check_count} guided checks for this target.'
+    return None
+
+
+def _next_step_lines(outcome_summary: dict) -> List[str]:
+    lines = ["## What to do next"]
+    active_finding_count = int(outcome_summary["active_finding_count"])
+    auto_count = int(outcome_summary["auto_count"])
+    input_count = int(outcome_summary["input_count"])
+    manual_review_count = int(outcome_summary["manual_review_count"])
+    guided_check_count = int(outcome_summary["guided_check_count"])
+    baseline_present = bool(outcome_summary["baseline_present"])
+
+    if auto_count > 0:
+        lines.append(
+            f'- **Safe to fix now ({auto_count}):** say "apply the safe fixes" and the agent will patch them.'
+        )
+    if input_count > 0:
+        lines.append(
+            f'- **Needs your decision ({input_count}):** say "walk me through the decisions" to answer them one at a time.'
+        )
+
+    test_it_yourself = _test_it_yourself_variant(manual_review_count, guided_check_count)
+    if test_it_yourself:
+        lines.append(f"- **Test it yourself:** {test_it_yourself}")
+
+    if active_finding_count == 0:
+        lines.append(
+            f'- **Baseline:** say "{_baseline_chat_verb(baseline_present)}" so this clean run becomes the regression reference.'
+        )
+    elif baseline_present:
+        lines.append(
+            '- **Baseline:** say "save the baseline" to make this run the new reference, '
+            'or "update the baseline" to refresh the existing one.'
+        )
+    else:
+        lines.append('- **Baseline:** say "save the baseline" to make this run the new reference.')
+
+    lines.append("")
+    return lines
+
+
+def build_markdown_report(
+    report: dict,
+    message_lookup: Dict[str, str],
+    manual_items: List[dict],
+    step_failures: List[dict],
+    render_context: Optional[dict] = None,
+) -> str:
     findings = report["findings"]
     active_findings = [f for f in findings if f["status"] == "open" and f["triage_group"] != "not_checked"]
     groups = defaultdict(list)
@@ -1581,41 +1757,19 @@ def build_markdown_report(report: dict, message_lookup: Dict[str, str], manual_i
     auto_issues = groups["autofix"]
     input_issues = groups["needs_input"]
     manual_issues = groups["manual_review"]
+    outcome_summary = build_outcome_summary(report, manual_items, markdown=True)
 
     generated_at = _parse_iso(report["generated_at"])
     report_date = generated_at.date().isoformat() if generated_at else date.today().isoformat()
 
     lines = []
     lines.append("# Accessibility Audit Report\n")
-    lines.append(f"**Target**: {report['target']}")
-    lines.append(f"**Framework**: {report['framework']}")
-    lines.append(f"**Standard**: {report['standard']}")
     lines.append(f"**Date**: {report_date}")
     lines.append("")
-    lines.append("## Summary")
-    lines.append(
-        f"Found {len(active_findings)} scanner-detected issues: "
-        f"**{len(auto_issues)} auto-fixable**, "
-        f"**{len(input_issues)} need your input**, "
-        f"plus a manual checklist below. "
-        f"({len(manual_issues)} scanner-flagged items require manual review.)"
-    )
-    by_scanner = report["summary"].get("by_scanner", {})
-    if any(by_scanner.values()):
-        scanner_parts = [
-            f"{scanner} {count}"
-            for scanner, count in by_scanner.items()
-            if count
-        ]
-        lines.append(f"By source: {', '.join(scanner_parts)}.")
-    by_confidence = report["summary"].get("by_confidence", {})
-    if any(by_confidence.values()):
-        confidence_parts = [
-            f"{confidence} {count}"
-            for confidence, count in by_confidence.items()
-            if count
-        ]
-        lines.append(f"By confidence: {', '.join(confidence_parts)}.")
+    lines.append(outcome_summary["outcome_body"])
+    lines.append("")
+    lines.extend(_snapshot_lines(report, render_context))
+    lines.extend(_next_step_lines(outcome_summary))
     status_counts = report["summary"].get("status_counts", {})
     if status_counts.get("waived") or status_counts.get("fixed") or status_counts.get("resolved") or status_counts.get("stale"):
         status_parts = [
@@ -1636,10 +1790,11 @@ def build_markdown_report(report: dict, message_lookup: Dict[str, str], manual_i
     lines.append("")
     lines.append("---\n")
 
-    lines.append(f"## Group 1: Auto-fixable ({len(auto_issues)} issues)")
-    lines.append("")
     if auto_issues:
-        lines.append('The agent can apply these fixes without further input. Reply **"go"** to proceed, or list which to skip.\n')
+        lines.append(f"## Safe to fix now ({len(auto_issues)})")
+        lines.append("")
+        lines.append('_The agent can apply these without further input. Say "apply the safe fixes" to proceed, or list which to skip._')
+        lines.append("")
         for index, finding in enumerate(auto_issues, start=1):
             lines.append(f"### {index}. [WCAG {finding['wcag'][0] if finding['wcag'] else 'best-practice'}] — {finding['title']}")
             lines.append(f"**Location**: {_display_location(finding)}")
@@ -1651,14 +1806,13 @@ def build_markdown_report(report: dict, message_lookup: Dict[str, str], manual_i
             lines.append("**Fix**:")
             lines.append(finding["proposed_fix"]["diff"] or "*(No automatic fix template available)*")
             lines.append("")
-    else:
-        lines.append("_None._\n")
-    lines.append("---\n")
+        lines.append("---\n")
 
-    lines.append(f"## Group 2: Needs your input ({len(input_issues)} issues)")
-    lines.append("")
     if input_issues:
-        lines.append("These need a decision from you. The agent can draft each fix once you answer.\n")
+        lines.append(f"## Needs your decision ({len(input_issues)})")
+        lines.append("")
+        lines.append('_Each item asks one question. Say "walk me through the decisions" and the agent will go one at a time._')
+        lines.append("")
         for index, finding in enumerate(input_issues, start=1):
             lines.append(f"### {index}. [WCAG {finding['wcag'][0] if finding['wcag'] else 'best-practice'}] — {finding['title']}")
             lines.append(f"**Location**: {_display_location(finding)}")
@@ -1673,16 +1827,18 @@ def build_markdown_report(report: dict, message_lookup: Dict[str, str], manual_i
                 lines.append("**Current code**:")
                 lines.append(f"```\n{current_code}\n```")
             lines.append("")
-    else:
-        lines.append("_None._\n")
-    lines.append("---\n")
+        lines.append("---\n")
 
-    lines.append("## Group 3: Manual checklist")
-    lines.append("")
+    if manual_issues or manual_items:
+        lines.append("## Test it yourself")
+        lines.append("")
+        lines.append("_These require a human in the browser or with assistive tech — the things automated scanners can't reliably check._")
+        lines.append("")
     if manual_issues:
-        lines.append("These findings require manual verification before remediation decisions are made.\n")
+        lines.append(f"### Manual findings ({len(manual_issues)})")
+        lines.append("")
         for index, finding in enumerate(manual_issues, start=1):
-            lines.append(f"### {index}. [WCAG {finding['wcag'][0] if finding['wcag'] else 'best-practice'}] — {finding['title']}")
+            lines.append(f"#### {index}. [WCAG {finding['wcag'][0] if finding['wcag'] else 'best-practice'}] — {finding['title']}")
             lines.append(f"**Location**: {_display_location(finding)}")
             if _comparison_value(finding):
                 lines.append(f"**Baseline**: {_comparison_value(finding)}")
@@ -1690,14 +1846,15 @@ def build_markdown_report(report: dict, message_lookup: Dict[str, str], manual_i
                 lines.append(f"**Blast radius**: {_blast_radius_value(finding)}")
             lines.append(f"**Issue**: {_finding_message(finding, message_lookup)}")
             lines.append("")
-    lines.append("These require you to test with actual assistive technology or in the browser. "
-                 "Automated tools catch roughly a third of accessibility issues — the rest live here.")
-    lines.append("")
-    lines.extend(_render_manual_checklist(manual_items, step_failures))
-    lines.append("---\n")
+    if manual_items:
+        lines.append(f"### Guided checklist ({len(manual_items)})")
+        lines.append("")
+        lines.extend(_render_guided_checklist(manual_items, step_failures))
+    if manual_issues or manual_items:
+        lines.append("---\n")
 
     if waived_findings:
-        lines.append(f"## Waived findings ({len(waived_findings)})")
+        lines.append(f"## Waived (skipped on purpose) ({len(waived_findings)})")
         lines.append("")
         for index, finding in enumerate(waived_findings, start=1):
             waiver = finding["waiver"] or {}
@@ -1714,7 +1871,7 @@ def build_markdown_report(report: dict, message_lookup: Dict[str, str], manual_i
         lines.append("---\n")
 
     if historical_findings:
-        lines.append(f"## Historical statuses ({len(historical_findings)})")
+        lines.append(f"## Resolved & tracked ({len(historical_findings)})")
         lines.append("")
         lines.append("These findings were carried from status records and are kept for tracking, not active remediation:")
         lines.append("")
@@ -1791,7 +1948,29 @@ def main():
 
     manual_items = generate_manual_review_items(report, stateful_data)
     step_failures = list((stateful_data or {}).get("step_failures", []))
-    markdown_report = build_markdown_report(report, message_lookup, manual_items, step_failures)
+    artifact_paths = []
+    if args.json_output:
+        artifact_paths.append(Path(args.json_output).name)
+    markdown_report = build_markdown_report(
+        report,
+        message_lookup,
+        manual_items,
+        step_failures,
+        render_context={
+            "mode": "triage",
+            "artifact_paths": artifact_paths,
+            "scanners_ran": [
+                scanner
+                for scanner, payload in (
+                    ("static", static_data),
+                    ("runtime", runtime_data),
+                    ("stateful", stateful_data),
+                    ("token", token_data),
+                )
+                if payload
+            ],
+        },
+    )
 
     if args.output:
         Path(args.output).write_text(markdown_report, encoding="utf-8")

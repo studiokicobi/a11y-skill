@@ -1,0 +1,203 @@
+{
+  "schema_version": "2.5.0",
+  "generated_at": "2026-01-02T03:04:05Z",
+  "target": "fixtures/audit-quick-static/source",
+  "framework": "html",
+  "standard": "WCAG 2.2 Level AA",
+  "summary": {
+    "scanner_detected_issue_count": 1,
+    "auto_fixable_count": 0,
+    "needs_input_count": 1,
+    "manual_review_count": 0,
+    "waived_count": 0,
+    "not_checked_count": 9,
+    "by_scanner": {
+      "static": 1,
+      "runtime": 0,
+      "stateful": 0,
+      "manual-template": 0,
+      "token": 0
+    },
+    "by_confidence": {
+      "high": 1,
+      "medium": 0,
+      "low": 0
+    },
+    "status_counts": {
+      "open": 1,
+      "waived": 0,
+      "fixed": 0,
+      "resolved": 0,
+      "stale": 0
+    }
+  },
+  "coverage_metadata": {
+    "coverage_source": "references/wcag_coverage.md",
+    "manual_checklist_included": true,
+    "not_checked_criteria": [
+      "1.2.1",
+      "1.2.2",
+      "1.2.3",
+      "1.2.4",
+      "1.2.5",
+      "1.4.2",
+      "2.2.1",
+      "2.2.2",
+      "2.3.1"
+    ]
+  },
+  "baseline_comparison": {
+    "baseline_present": false,
+    "baseline_generated_at": "",
+    "summary": {
+      "new": 0,
+      "unchanged": 0,
+      "fixed": 0,
+      "resolved": 0,
+      "stale": 0,
+      "waived": 0
+    }
+  },
+  "findings": [
+    {
+      "id": "fbb14a19f5cf",
+      "rule_id": "img-missing-alt",
+      "title": "Image missing alt attribute",
+      "wcag": [
+        "1.1.1"
+      ],
+      "severity": "serious",
+      "scanner": "static",
+      "scanner_version": "2.5.0",
+      "detected_at": "2026-01-02T03:04:05Z",
+      "triage_group": "needs_input",
+      "fix_safety": "input-required",
+      "confidence": "high",
+      "status": "open",
+      "group_reason": "Finding requires human input, content intent, or scanner uncertainty before remediation.",
+      "location": {
+        "file": "fixtures/audit-quick-static/source/index.html",
+        "line": 4,
+        "column": 5,
+        "url": "",
+        "selector": "",
+        "journey_step_id": ""
+      },
+      "mapping": {
+        "source_file": "fixtures/audit-quick-static/source/index.html",
+        "source_line": 4,
+        "confidence": "high",
+        "explanation": "Mapped directly from the source scanner location."
+      },
+      "evidence": {
+        "snippet": "<img src=\"hero.jpg\">",
+        "dom_snippet": "",
+        "screenshot": "",
+        "axe_help_url": ""
+      },
+      "decision_required": {
+        "question": "What does this image convey? (For decorative images, we'll use alt=\"\".)",
+        "options": []
+      },
+      "proposed_fix": {
+        "kind": "none",
+        "diff": "",
+        "notes": ""
+      },
+      "fingerprint": "img-missing-alt|fixtures/audit-quick-static/source/index.html|line|line-4",
+      "confirmed_by": [
+        "static"
+      ],
+      "waiver": null,
+      "fingerprint_data": {
+        "fingerprint_version": "1.0",
+        "anchor_source": "line",
+        "anchor_value": "line-4",
+        "unstable": true
+      }
+    }
+  ],
+  "not_checked": [
+    {
+      "rule_id": "not-checked-1-2-1",
+      "title": "Audio-only and Video-only (Prerecorded)",
+      "wcag": [
+        "1.2.1"
+      ],
+      "status": "open",
+      "notes": "Media asset review required."
+    },
+    {
+      "rule_id": "not-checked-1-2-2",
+      "title": "Captions (Prerecorded)",
+      "wcag": [
+        "1.2.2"
+      ],
+      "status": "open",
+      "notes": "Media asset review required."
+    },
+    {
+      "rule_id": "not-checked-1-2-3",
+      "title": "Audio Description or Media Alternative (Prerecorded)",
+      "wcag": [
+        "1.2.3"
+      ],
+      "status": "open",
+      "notes": "Media asset review required."
+    },
+    {
+      "rule_id": "not-checked-1-2-4",
+      "title": "Captions (Live)",
+      "wcag": [
+        "1.2.4"
+      ],
+      "status": "open",
+      "notes": "Live media review required."
+    },
+    {
+      "rule_id": "not-checked-1-2-5",
+      "title": "Audio Description (Prerecorded)",
+      "wcag": [
+        "1.2.5"
+      ],
+      "status": "open",
+      "notes": "Media asset review required."
+    },
+    {
+      "rule_id": "not-checked-1-4-2",
+      "title": "Audio Control",
+      "wcag": [
+        "1.4.2"
+      ],
+      "status": "open",
+      "notes": "Static autoplay checks are partial and do not verify controls."
+    },
+    {
+      "rule_id": "not-checked-2-2-1",
+      "title": "Timing Adjustable",
+      "wcag": [
+        "2.2.1"
+      ],
+      "status": "open",
+      "notes": "Flow and session review required."
+    },
+    {
+      "rule_id": "not-checked-2-2-2",
+      "title": "Pause, Stop, Hide",
+      "wcag": [
+        "2.2.2"
+      ],
+      "status": "open",
+      "notes": "Flow and motion review required."
+    },
+    {
+      "rule_id": "not-checked-2-3-1",
+      "title": "Three Flashes or Below Threshold",
+      "wcag": [
+        "2.3.1"
+      ],
+      "status": "open",
+      "notes": "Visual review required."
+    }
+  ]
+}

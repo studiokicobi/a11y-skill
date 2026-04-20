@@ -2,24 +2,43 @@
 
 **Date**: <DATE>
 
-No active findings. Generated **6** guided checks for this target — say "give me the checklist" to walk through them, or "update the baseline" to refresh it.
+Found **1** active findings: **0** safe to fix now, **1** need your decision. Also generated **6** guided checks for this target.
 
 ## Snapshot
-- Target: fixtures/baseline-unstable-fallback
+- Target: fixtures/audit-quick-static/source
 - Framework: html
 - Standard: WCAG 2.2 Level AA
-- Mode: triage
+- Mode: quick
 - Checked: static
-- Baseline: stale 1
+- Findings by source: static 1
+- Baseline: none
+- Confidence: high 1
 Artifacts:
-- `triage-report.json`
+- `report.json`
+- `summary.md`
+- `manifest.json`
+- `scanners/static.json`
 
 ## What to do next
+- **Needs your decision (1):** say "walk me through the decisions" to answer them one at a time.
 - **Test it yourself:** say "give me the checklist" — 6 guided checks for this target.
-- **Baseline:** say "update the baseline" so this clean run becomes the regression reference.
+- **Baseline:** say "save the baseline" to make this run the new reference.
 
-Tracked statuses: stale 1.
-Regression summary: stale 1.
+
+---
+
+## Needs your decision (1)
+
+_Each item asks one question. Say "walk me through the decisions" and the agent will go one at a time._
+
+### 1. [WCAG 1.1.1] — Image missing alt attribute
+**Location**: `fixtures/audit-quick-static/source/index.html:4`
+**Issue**: <img> missing alt attribute. Screen readers will read the filename or skip it.
+**Decision needed**: What does this image convey? (For decorative images, we'll use alt="".)
+**Current code**:
+```
+<img src="hero.jpg">
+```
 
 ---
 
@@ -94,18 +113,6 @@ _These require a human in the browser or with assistive tech — the things auto
 **Expected result**:
 - [ ] Meaning is still clear without color perception.
 - [ ] Status and selection are conveyed with text, iconography, or structural cues in addition to color.
-
----
-
-## Resolved & tracked (1)
-
-These findings were carried from status records and are kept for tracking, not active remediation:
-
-### 1. [WCAG 2.1.1] — Non-interactive element with click handler
-**Location**: `fixtures/baseline-unstable-fallback/index.html:5`
-**Status**: stale
-**Baseline**: stale
-**Reason**: Rule is classified as safe to patch automatically for this evidence source.
 
 ---
 

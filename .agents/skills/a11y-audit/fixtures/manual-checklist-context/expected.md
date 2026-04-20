@@ -1,37 +1,36 @@
 # Accessibility Audit Report
 
-**Target**: https://example.test/settings
-**Framework**: stateful
-**Standard**: WCAG 2.2 Level AA
 **Date**: <DATE>
 
-## Summary
-Found 0 scanner-detected issues: **0 auto-fixable**, **0 need your input**, plus a manual checklist below. (0 scanner-flagged items require manual review.)
+No active findings. Generated **10** guided checks for this target — say "give me the checklist" to walk through them, or "save the baseline" to lock this clean run in.
+
+## Snapshot
+- Target: https://example.test/settings
+- Framework: stateful
+- Standard: WCAG 2.2 Level AA
+- Mode: triage
+- Checked: stateful
+- Baseline: none
+Artifacts:
+- `triage-report.json`
+
+## What to do next
+- **Test it yourself:** say "give me the checklist" — 10 guided checks for this target.
+- **Baseline:** say "save the baseline" so this clean run becomes the regression reference.
+
 
 ---
 
-## Group 1: Auto-fixable (0 issues)
+## Test it yourself
 
-_None._
+_These require a human in the browser or with assistive tech — the things automated scanners can't reliably check._
 
----
-
-## Group 2: Needs your input (0 issues)
-
-_None._
-
----
-
-## Group 3: Manual checklist
-
-These require you to test with actual assistive technology or in the browser. Automated tools catch roughly a third of accessibility issues — the rest live here.
+### Guided checklist (10)
 
 Recorded journey step failures:
 - `submit-invalid` (click) — Example failure note for manual follow-up.
 
-Assisted checks:
-
-### 1. Keyboard tab order through the audited page or flow
+#### 1. Keyboard tab order through the audited page or flow
 **Capability**: `keyboard`
 **WCAG**: 2.1.1, 2.4.3
 **Context**: Use the current page-load state and every audited interaction state.
@@ -42,7 +41,7 @@ Assisted checks:
 - [ ] Every interactive element is reachable in a logical visual order.
 - [ ] No keyboard trap appears and focus never jumps to hidden or inert UI.
 
-### 2. Focus visibility and focus return behavior
+#### 2. Focus visibility and focus return behavior
 **Capability**: `visual`
 **WCAG**: 2.4.7, 2.4.11
 **Context**: Check each interactive state reached during the audit.
@@ -53,7 +52,7 @@ Assisted checks:
 - [ ] The active element has a visible focus indicator with sufficient contrast.
 - [ ] When transient UI closes, focus returns to a sensible trigger or next logical control.
 
-### 3. Heading outline and page title announcement
+#### 3. Heading outline and page title announcement
 **Capability**: `screen reader`
 **WCAG**: 1.3.1, 2.4.2, 2.4.6
 **Context**: Inspect the current page and any post-interaction destination states.
@@ -64,7 +63,7 @@ Assisted checks:
 - [ ] The title uniquely identifies the current page or state.
 - [ ] Heading levels form a logical outline without skipped or decorative headings being announced as structure.
 
-### 4. Zoom, reflow, and text spacing resilience
+#### 4. Zoom, reflow, and text spacing resilience
 **Capability**: `browser`
 **WCAG**: 1.4.10, 1.4.12
 **Context**: Run this on the main page and any key post-interaction view.
@@ -75,7 +74,7 @@ Assisted checks:
 - [ ] Content remains usable without horizontal scrolling for main reading content.
 - [ ] No clipping, overlap, or lost controls appear when text spacing is increased.
 
-### 5. Reduced motion and motion-triggered interactions
+#### 5. Reduced motion and motion-triggered interactions
 **Capability**: `visual`
 **WCAG**: 2.3.*
 **Context**: Repeat the audited journey with reduced motion enabled if the UI animates.
@@ -86,7 +85,7 @@ Assisted checks:
 - [ ] Non-essential motion is reduced or removed.
 - [ ] Animations do not block task completion or hide focus movement.
 
-### 6. Use-of-color-only communication
+#### 6. Use-of-color-only communication
 **Capability**: `visual`
 **WCAG**: 1.4.1
 **Context**: Check interactive controls, validation states, charts, and inline status messages.
@@ -97,7 +96,7 @@ Assisted checks:
 - [ ] Meaning is still clear without color perception.
 - [ ] Status and selection are conveyed with text, iconography, or structural cues in addition to color.
 
-### 7. Overlay escape, trap, and focus return
+#### 7. Overlay escape, trap, and focus return
 **Capability**: `keyboard`
 **WCAG**: 2.1.2, 2.4.3
 **Context**: Replay step `open-modal`.
@@ -108,7 +107,7 @@ Assisted checks:
 - [ ] Focus stays inside the overlay while it is open, unless the pattern intentionally allows background interaction.
 - [ ] Escape closes the overlay when appropriate, and focus returns to the trigger or next logical control.
 
-### 8. Form labels, errors, and required-state announcements
+#### 8. Form labels, errors, and required-state announcements
 **Capability**: `screen reader`
 **WCAG**: 3.3.1, 3.3.2, 4.1.2, 4.1.3
 **Context**: Use the form states reached in the audited flow, including invalid submissions.
@@ -119,7 +118,7 @@ Assisted checks:
 - [ ] Every field announces a clear programmatic label and required status.
 - [ ] Errors are announced in text, associated to the affected field, and do not rely on color alone.
 
-### 9. Dynamic status and validation announcements
+#### 9. Dynamic status and validation announcements
 **Capability**: `screen reader`
 **WCAG**: 4.1.3
 **Context**: Replay the audited interaction steps that update content without a full reload.
@@ -130,7 +129,7 @@ Assisted checks:
 - [ ] Important updates are announced promptly.
 - [ ] Announcements are concise and do not double-announce stale content.
 
-### 10. SPA route change announcement and focus placement
+#### 10. SPA route change announcement and focus placement
 **Capability**: `screen reader`
 **WCAG**: 2.4.3, 4.1.3
 **Context**: Replay step `go-dashboard`.

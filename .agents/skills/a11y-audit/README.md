@@ -2,16 +2,14 @@
 
 WCAG 2.2 Level AA accessibility audit skill for Claude Code, Codex, and other agent runtimes.
 
-Produces a **triaged report grouped by fix autonomy** — auto-fixable, needs your input, manual checklist — rather than a flat severity-sorted list. This matches how a human-plus-agent workflow actually proceeds: the agent patches what it can on approval, drafts what needs a decision, and hands off what requires assistive-tech testing.
+Produces a **triaged report grouped by fix autonomy** — **Safe to fix now**, **Needs your decision**, and **Test it yourself** — rather than a flat severity-sorted list. This matches how a human-plus-agent workflow actually proceeds: the agent patches what it can on approval, drafts what needs a decision, and hands off what requires assistive-tech testing.
 
 ## What it checks
 
-- **Static analysis** of source files (Python, no dependencies): missing `alt`, `<div onClick>`, hardcoded low-contrast colors, missing labels, `outline: none` without replacement, redundant ARIA, positive `tabindex`, `aria-hidden` on focusable elements, and more.
-- **Runtime analysis** via Playwright + axe-core: computed color contrast, focus management as rendered, ARIA state after hydration, landmark regions, live regions, heading order, and axe incomplete results routed to manual/input review.
-- **Stateful journey analysis** via Playwright + axe-core checkpoints: post-interaction findings tagged with `journey_step_id`, focus transitions, step failures, and screenshots per audited state.
-- **WCAG 2.2** coverage including the new criteria: 2.4.11 Focus Appearance, 2.5.7 Dragging Movements, 2.5.8 Target Size, 3.3.7 Redundant Entry, 3.3.8 Accessible Authentication.
-
-Automated tools catch roughly 30–40% of accessibility issues. This skill is honest about that — the manual checklist covers what the scanners can't reach.
+- **Static analysis** of source files for issues the agent can often fix directly or map cleanly back to source.
+- **Runtime analysis** via Playwright + axe-core for rendered DOM behavior such as computed contrast, focus management, and hydrated semantics.
+- **Stateful journey analysis** for interaction-driven states, with findings tagged by journey step.
+- **Guided human checks** for the accessibility work automated scanners cannot verify reliably.
 
 ## Install
 
@@ -55,9 +53,88 @@ Just ask your agent:
 
 The skill triggers on any request mentioning accessibility, a11y, WCAG, screen readers, keyboard navigation, color contrast, ARIA, or related topics.
 
-## Manual invocation
+After the audit completes the agent will suggest the next actions for your run.
+Common ones include:
 
-The scripts are usable directly:
+> "apply the safe fixes" — agent patches what it can
+> "walk me through the decisions" — agent asks you one question at a time
+> "give me the checklist" — full Test-it-yourself view, including scanner-flagged manual findings and guided checks
+> "show me the manual findings" — narrower view of just the scanner-flagged items that need human verification
+> "save the baseline" — lock in this run as the regression reference
+> "run the CI check" — re-check against the baseline on a PR
+
+The console output highlights the recommended first step; the full report shows the complete set of next actions.
+
+## How this is different
+
+- **Fix autonomy comes first.** Most tools sort by severity. This skill sorts by who can fix the issue and what kind of hand-off is needed.
+- **Source-aware reporting.** Runtime and stateful findings carry source-mapping confidence instead of stopping at the DOM snapshot.
+- **Agent-native conversation contract.** The report and skill agree on the exact verbs the user can say next.
+- **Stateful journeys, not just pages.** Findings can stay attached to the interaction step that produced them.
+- **Honest coverage.** The report keeps **Test it yourself** and **Not checked** visible so a clean automated run does not overclaim accessibility.
+- **One public workflow surface.** `audit` and `ci` stay the visible entry points, with the rest kept as building blocks.
+
+## Public workflow
+
+Most users should start with the orchestrator, not the individual scripts:
+
+```bash
+# Quick local audit of source only
+python3 scripts/cli.py audit --path src/
+
+# Quick local audit of a running site
+python3 scripts/cli.py audit --url http://localhost:3000
+
+# Full local audit with packaged artifacts
+python3 scripts/cli.py audit \
+  --path . \
+  --url http://localhost:3000 \
+  --mode full \
+  --output-dir .artifacts/a11y/latest
+
+# Full audit with explicit configs and baseline comparison
+python3 scripts/cli.py audit \
+  --path . \
+  --url http://localhost:3000 \
+  --mode full \
+  --runtime-config .a11y/runtime.config.json \
+  --journey-config .a11y/journey.config.yaml \
+  --token-file .a11y/tokens.json \
+  --status-file .a11y/status.json \
+  --baseline-file .a11y/baseline.json \
+  --output-dir .artifacts/a11y/latest
+
+# Save a baseline from the public flow
+python3 scripts/cli.py audit \
+  --path . \
+  --mode quick \
+  --output-dir .artifacts/a11y/latest \
+  --write-baseline .a11y/baseline.json
+
+# CI / PR workflow
+python3 scripts/cli.py ci \
+  --path . \
+  --url http://localhost:3000 \
+  --baseline-file .a11y/baseline.json \
+  --changed-files .a11y/changed-files.txt \
+  --output-dir .artifacts/a11y/ci \
+  --ci
+```
+
+Both commands write one artifact directory per run containing:
+
+- `report.md`
+- `report.json`
+- `summary.md`
+- `manifest.json`
+- scanner JSON under `scanners/`
+- screenshots and other evidence under `evidence/`
+
+The top of `report.md` includes a one-line outcome summary, a snapshot of what was checked, an artifact index, and a mandatory `What to do next` block before the bucketed findings.
+
+## Advanced invocation
+
+The lower-level scripts remain available for debugging, fixtures, and advanced usage:
 
 ```bash
 # Static scan
@@ -99,11 +176,18 @@ python3 scripts/contrast_checker.py --fg "#999" --bg "#fff" --suggest
 
 ## Report structure
 
-The output is markdown with three sections in this order:
+The full markdown report starts with:
 
-1. **Auto-fixable** — each issue has a ready diff. Reply "go" and the agent applies them.
-2. **Needs your input** — each issue has a specific decision prompt. The agent drafts the fix after you answer.
-3. **Manual checklist** — capability-tagged assisted checks derived from the page and journey context. You must test these yourself.
+- one-line outcome summary
+- `Snapshot`
+- artifact index
+- `What to do next`
+
+Then it continues with the fix-autonomy buckets in this order:
+
+1. **Safe to fix now** — each issue has a ready diff and the report tells the user to say "apply the safe fixes".
+2. **Needs your decision** — each issue has a specific decision prompt and is handled one question at a time.
+3. **Test it yourself** — split into scanner-flagged `Manual findings` and the always-generated `Guided checklist`.
 
 Plus a "Not checked" section listing WCAG criteria that no automated tool can evaluate, so you know the gaps.
 
@@ -113,7 +197,7 @@ When `--json-output` is used, the normalized report includes deterministic `not_
 
 The normalized JSON report is the source for repeatable regression tracking.
 
-- Use `--write-baseline` on `triage.py`, or `scripts/baseline.py`, to save a stable JSON baseline.
+- Use `--write-baseline` on `cli.py audit`, `--write-baseline` on `triage.py`, or `scripts/baseline.py`, to save a stable JSON baseline.
 - Use `--baseline-file` on later runs to classify findings as `new`, `unchanged`, `fixed`, `resolved`, `stale`, or `waived`.
 - Static findings use stable-anchor precedence for fingerprints: `id`, `data-testid`, associated label, `name`, nearest heading, then line fallback.
 - Token findings use `rule_id + file + token anchor` fingerprints so design-system issues survive line movement in the token file.
@@ -133,7 +217,7 @@ Runtime and stateful findings now carry a `mapping` object with confidence and e
   - `data-component-stack` values that include `path:line`
 - If no mapping hints are present, runtime/stateful findings stay `low` confidence and are excluded from changed-files scoping.
 
-`cli.py` adds CI-oriented behavior:
+`cli.py ci` adds CI-oriented behavior:
 
 - `--changed-files` scopes the report to the listed source files using `mapping.source_file` or direct source locations.
 - `--pr-summary-output` writes GitHub-friendly markdown.

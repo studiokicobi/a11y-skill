@@ -1,6 +1,6 @@
 ---
 name: a11y-audit
-description: Audit websites and web apps for WCAG 2.2 AA accessibility compliance. Use this skill whenever the user mentions accessibility, a11y, WCAG, screen readers, keyboard navigation, color contrast, ARIA, axe-core, alt text, focus indicators, or asks to check/test/audit a site for disability access, even if they don't explicitly say "accessibility." Also trigger when the user asks to review a frontend codebase for inclusivity, compliance, or Section 508 / EN 301 549 / ADA concerns. Produces a triaged report grouped by fix autonomy (auto-fixable, needs-human-input, manual-checklist) rather than raw severity dumps.
+description: Audit websites and web apps for WCAG 2.2 AA accessibility compliance. Use this skill whenever the user mentions accessibility, a11y, WCAG, screen readers, keyboard navigation, color contrast, ARIA, axe-core, alt text, focus indicators, or asks to check/test/audit a site for disability access, even if they don't explicitly say "accessibility." Also trigger when the user asks to review a frontend codebase for inclusivity, compliance, or Section 508 / EN 301 549 / ADA concerns. Produces a triaged report grouped by fix autonomy into Safe to fix now, Needs your decision, and Test it yourself.
 ---
 
 # a11y-audit
@@ -11,11 +11,11 @@ A WCAG 2.2 Level AA accessibility audit skill built for coding agents. The outpu
 
 Most a11y tools produce a flat list of violations sorted by severity. That's useful for a human reading a compliance report, but it's the wrong shape for an agent-plus-human workflow. An agent can confidently fix some issues (replacing `<div onClick>` with `<button>`, adding `type="button"`, remapping a known-bad Tailwind color class), needs the user's judgement for others (what *should* the alt text say, what label copy to use), and can't do a third category at all (did the focus order feel right, did NVDA announce the modal clearly).
 
-This skill produces three groups in that order:
+This skill produces three buckets in that order:
 
-1. **Auto-fixable** — the agent can patch the code. Lists each issue with the exact edit. User approves, agent proceeds.
-2. **Needs human input** — the agent drafts, the user decides. Lists each issue with a proposed fix and the decision needed.
-3. **Manual checklist** — the user must do this themselves, with assistive tech. Lists capability-tagged assisted checks derived from the page and journey context.
+1. **Safe to fix now** — the agent can patch these without further input once the user asks for that bucket.
+2. **Needs your decision** — the agent drafts each fix once the user answers one question.
+3. **Test it yourself** — these need a human in the browser or with assistive tech, including guided checks derived from the page and journey context.
 
 ## When to use this skill
 
@@ -36,9 +36,42 @@ Before running anything, establish:
 
 If the target isn't obvious from the request or working directory, ask the user briefly. Don't guess at a framework — detect it (check `package.json`, file extensions) or ask.
 
-### Step 2: Run the scan
+### Step 2: Run the public workflow
 
-Two scanners are available. Pick based on what's accessible:
+Default to the public orchestrator, not the internal scripts:
+
+```bash
+# Quick audit
+python3 scripts/cli.py audit --path <path>
+python3 scripts/cli.py audit --url <url>
+
+# Full audit with explicit configs
+python3 scripts/cli.py audit \
+  --path <path> \
+  --url <url> \
+  --mode full \
+  --runtime-config runtime.config.json \
+  --journey-config journey.config.json \
+  --token-file tokens.json \
+  --baseline-file baseline.json \
+  --status-file status.json \
+  --output-dir .artifacts/a11y/latest
+```
+
+Use `audit` for operator-facing local runs. It writes one artifact package containing:
+
+- `report.md`
+- `report.json`
+- `summary.md`
+- `manifest.json`
+- scanner JSON under `scanners/`
+- evidence under `evidence/`
+
+The top of `report.md` must tell the user what to do next before it lists the buckets.
+
+### Step 3: Choose the scanners
+
+The orchestrator decides which scanner inputs to run from the supplied path, URL, and optional configs. The underlying scanners are still:
 
 **Static scan** (default, always available):
 ```bash
@@ -76,65 +109,56 @@ This is intentionally narrow. It currently supports one explicit JSON token sche
 
 **If the user gives a production URL but no source**, runtime only. Fixes will be framework-agnostic HTML/CSS suggestions.
 
-### Step 3: Triage
+### Step 4: CI mode
 
-Run the triage script to produce the three-group report:
+For CI or PR workflows, use the public `ci` command:
 ```bash
-python3 scripts/triage.py --static /tmp/a11y-static.json --runtime /tmp/a11y-runtime.json --stateful /tmp/a11y-stateful.json --output /tmp/a11y-report.md
-```
-
-The script applies the triage rules in `references/triage-rules.md`. Read that file before making triage decisions manually — do not classify issues from memory.
-
-For repeated scans, compare against a saved baseline and carry status/waiver records:
-```bash
-python3 scripts/triage.py \
-  --static /tmp/a11y-static.json \
-  --runtime /tmp/a11y-runtime.json \
-  --stateful /tmp/a11y-stateful.json \
-  --tokens /tmp/a11y-tokens.json \
-  --status-file status.json \
-  --baseline-file baseline.json \
-  --output /tmp/a11y-report.md \
-  --json-output /tmp/a11y-report.json
-```
-
-To save a fresh baseline after a confirmed run:
-```bash
-python3 scripts/baseline.py --report /tmp/a11y-report.json --output baseline.json
-```
-
-For CI or PR workflows, use the orchestrator:
-```bash
-python3 scripts/cli.py \
-  --static /tmp/a11y-static.json \
-  --runtime /tmp/a11y-runtime.json \
+python3 scripts/cli.py ci \
+  --path . \
+  --url http://localhost:3000 \
   --baseline-file baseline.json \
   --changed-files changed-files.txt \
-  --pr-summary-output pr-summary.md \
+  --output-dir .artifacts/a11y/ci \
   --ci
 ```
 By default, CI blocks on new `serious` or `critical` findings with `high` confidence. Manual-review findings stay non-blocking unless explicitly opted in.
 
-### Step 4: Present the report
+Keep `triage.py`, `report.py`, and `baseline.py` for fixtures, debugging, and advanced usage. The script still applies the triage rules in `references/triage-rules.md`, and you should read that file before making triage decisions manually.
 
-Show the report to the user. Lead with a one-line summary:
-> Found N issues: X auto-fixable, Y need your input, Z manual checks.
+## Conversation contract
 
-Then the three groups in order. For the auto-fixable group, end with:
-> Reply "go" to apply auto-fixable fixes, or list which ones to skip.
+After `audit` completes, reuse the exact generated `outcome_body` string from that run. Do not recompute it, summarize it, or paraphrase it. Wrap it exactly like this:
 
-Do not start editing files until the user responds.
+`Audit complete. {outcome_body} Full report: \`{path}\`. What would you like to do?`
 
-### Step 5: Apply auto-fixes (on approval)
+Recognized user intents:
+- `apply the safe fixes` or `fix what you can`: work through **Safe to fix now**, edit files, rerun the static scan, and report only the delta.
+- `walk me through the decisions` or `start the decisions`: work through **Needs your decision** one item at a time. Ask one question, wait, then draft and apply the fix after confirmation.
+- `give me the checklist` or `what do I test?`: render **Test it yourself** as the actionable list for this run, covering both `Manual findings` and `Guided checklist`.
+- `show me the manual findings`: render only the `Manual findings` subsection from **Test it yourself**.
+- `save the baseline` or `update the baseline`: promote the previously generated report for the selected run. Never re-scan implicitly. Use the most recently announced `manifest.json` or `report.json` from this conversation unless the user names a different run. If none has been announced, or the requested run is ambiguous, ask. After confirmation, use `python3 scripts/cli.py promote-baseline --report <path/to/report.json> --baseline-file <path>`.
+- `run the CI check` or `check for regressions`: run `python3 scripts/cli.py ci ...` against the chosen baseline and report blockers with the generated summary path.
+- `re-audit`: rerun `python3 scripts/cli.py audit ...` with the same inputs and report the delta from the last run.
 
-When the user approves:
-1. For each auto-fixable issue, read the target file, apply the exact fix from the report, save.
-2. After all fixes, re-run the static scan to confirm resolution and check for regressions.
-3. Report the delta: what was resolved, what remains, any new issues introduced.
+Intent synonyms:
+- `go ahead`, `do it`, and `yes` only count when the agent has just proposed one specific action. They are not standalone commands.
+- Never ask the user to reply with `go`.
 
-For the needs-human-input group, work through each item one at a time. Ask the user the specific decision, apply the fix, move to the next.
+Pause points:
+1. After the audit, before any file edits.
+2. Between each **Needs your decision** item. Never batch multiple decisions.
+3. Before saving or updating a baseline. Confirm that this run becomes the new reference.
 
-For the manual checklist, hand it off. Offer to come back and mark items as the user confirms them.
+Hand-off etiquette for **Test it yourself**:
+- Offer to track checklist progress in chat as the user works through it.
+- Do not claim the audit is complete while checklist items remain unchecked unless the user explicitly closes them out.
+- If the user asks for just the scanner-routed items, show `Manual findings` only. If they ask what to test, show both `Manual findings` and `Guided checklist`.
+
+What the agent must not do:
+- Do not edit files unless the user has expressed one of the apply intents above.
+- Do not auto-run `ci` after `audit`.
+- Do not restate the full report after every action; show only what changed.
+- Do not use numbered group labels in chat. Use **Safe to fix now**, **Needs your decision**, and **Test it yourself**.
 
 ## Fix patterns
 
@@ -163,13 +187,13 @@ The skill honestly splits coverage into three tiers. Don't claim more than this.
 - 4.1.2 — Redundant ARIA roles on semantic elements; `aria-hidden="true"` on focusable elements
 - best-practice — `target="_blank"` without `rel="noopener noreferrer"`
 
-**Runtime scanner (axe-core via `a11y_runtime.js`):** runs the full axe-core rule set tagged `wcag2a`, `wcag2aa`, `wcag21a`, `wcag21aa`, `wcag22a`, `wcag22aa`, and `best-practice`. This includes computed color contrast, focus management, ARIA state after hydration, landmark regions, heading order, live regions, target size (WCAG 2.2 — 2.5.8), and many more. Axe-incomplete results (checks axe couldn't fully verify) are routed to Group 2 for manual confirmation.
+**Runtime scanner (axe-core via `a11y_runtime.js`):** runs the full axe-core rule set tagged `wcag2a`, `wcag2aa`, `wcag21a`, `wcag21aa`, `wcag22a`, `wcag22aa`, and `best-practice`. This includes computed color contrast, focus management, ARIA state after hydration, landmark regions, heading order, live regions, target size (WCAG 2.2 — 2.5.8), and many more. Axe-incomplete results (checks axe couldn't fully verify) are routed to **Needs your decision** for manual confirmation.
 
 When runtime/stateful DOM snippets expose debug source hints such as `data-source-file`, `data-source-line`, `data-source-loc`, or `data-component-stack`, the normalized report maps those findings back to likely source files with `high` or `medium` confidence. Without those hints, runtime/stateful mapping remains `low` confidence and should stay informational.
 
 **Stateful scanner (`a11y_stateful.js`):** runs Playwright journeys described in `references/journey_schema.md`, executes `click`, `press`, `fill`, `select`, `navigate`, and `assert` steps, and performs checkpoint axe scans after selected steps. Findings preserve `journey_step_id`, and the raw output records focus transitions, step failures, and checkpoint screenshots.
 
-**Manual checklist (neither scanner can automate):** keyboard navigation (full tab walkthrough), screen reader testing, visual reflow, motion sensitivity, cognitive accessibility, and the WCAG 2.2 criteria that require flow review (2.5.7 Dragging, 3.3.7 Redundant Entry, 3.3.8 Accessible Authentication). See `references/triage-rules.md` for the full checklist.
+**Guided checklist (neither scanner can automate):** keyboard navigation (full tab walkthrough), screen reader testing, visual reflow, motion sensitivity, cognitive accessibility, and the WCAG 2.2 criteria that require flow review (2.5.7 Dragging, 3.3.7 Redundant Entry, 3.3.8 Accessible Authentication). See `references/triage-rules.md` for the full checklist.
 
 **Not checked by either:** captions, audio descriptions, transcripts, timing-adjustable controls, seizure risk assessment, reading-level analysis, consistent-navigation review, error prevention on destructive actions. These WCAG criteria require media review or multi-page flow analysis, which is outside scope. The audit report lists these explicitly in the "Not checked" section so gaps are visible.
 
@@ -196,19 +220,34 @@ The triaged report is markdown with this structure. Do not deviate.
 ```
 # Accessibility Audit Report
 
-**Target**: <path or URL>
-**Framework**: <detected>
-**Standard**: WCAG 2.2 Level AA
 **Date**: <ISO date>
 
-## Summary
-<one line: N issues total — X auto-fixable, Y need input, plus Z manual checks>
+<one line: exact generated outcome_body wording, with markdown emphasis only>
+
+## Snapshot
+- Target: <path or URL>
+- Framework: <detected>
+- Standard: WCAG 2.2 Level AA
+- Checked: <static, runtime, stateful, token>
+- Baseline: <none | summary>
+- Confidence: <high N, medium N, low N>
+Artifacts:
+- `report.json`
+- `summary.md`
+- `manifest.json`
+- `scanners/<scanner>.json`
+
+## What to do next
+- **Safe to fix now (X):** say "apply the safe fixes" and the agent will patch them.
+- **Needs your decision (Y):** say "walk me through the decisions" to answer them one at a time.
+- **Test it yourself:** <canonical variant based on manual findings count and guided checklist count>
+- **Baseline:** <canonical save/update baseline wording>
 
 ---
 
-## Group 1: Auto-fixable (X issues)
+## Safe to fix now (X)
 
-The agent can apply these fixes without further input. Reply "go" to proceed, or list which to skip.
+_The agent can apply these without further input. Say "apply the safe fixes" to proceed, or list which to skip._
 
 ### 1. [WCAG criterion] — <short title>
 **Location**: `path/to/file.tsx:42`
@@ -223,9 +262,9 @@ The agent can apply these fixes without further input. Reply "go" to proceed, or
 
 ---
 
-## Group 2: Needs your input (Y issues)
+## Needs your decision (Y)
 
-These need a decision from you. The agent can draft each fix once you answer.
+_Each item asks one question. Say "walk me through the decisions" and the agent will go one at a time._
 
 ### 1. [WCAG criterion] — <short title>
 **Location**: `path/to/file.tsx:42`
@@ -240,11 +279,19 @@ These need a decision from you. The agent can draft each fix once you answer.
 
 ---
 
-## Group 3: Manual checklist
+## Test it yourself
 
-These require you to test with actual assistive technology or in the browser.
+_These require a human in the browser or with assistive tech — the things automated scanners can't reliably check._
 
-### 1. <assisted check title>
+### Manual findings (M)
+
+#### 1. [WCAG criterion] — <short title>
+**Location**: `path/to/file.tsx:42`
+**Issue**: <what's wrong>
+
+### Guided checklist (C)
+
+#### 1. <assisted check title>
 **Capability**: `keyboard|screen reader|visual|browser`
 **WCAG**: <criteria>
 **Context**: <page or step context>
@@ -261,7 +308,7 @@ These require you to test with actual assistive technology or in the browser.
 
 ## What this skill does NOT do
 
-- **Not a replacement for manual testing with real assistive technology.** Automated tools catch around 30–40% of accessibility issues. The manual checklist exists because the rest require human judgement.
+- **Not a replacement for manual testing with real assistive technology.** Automated checks cover only part of accessibility work. The **Test it yourself** bucket exists because the rest requires human judgement.
 - **Not legal advice.** WCAG compliance and legal requirements (ADA, Section 508, EN 301 549, EAA) are related but distinct. The skill flags violations; it doesn't certify compliance.
 - **Not a design tool.** If contrast is failing because the brand palette is fundamentally inaccessible, the skill surfaces that but won't redesign the palette.
 

@@ -149,6 +149,29 @@ def filter_report(report: dict, changed_files: Set[str]) -> dict:
     return filtered
 
 
+def build_scope_metadata(report: dict, changed_files: Set[str]) -> dict:
+    if not changed_files:
+        return {
+            "excluded_total_count": 0,
+            "excluded_low_confidence_count": 0,
+        }
+
+    excluded = [
+        finding for finding in report.get("findings", [])
+        if finding.get("status") == "open"
+        and finding.get("triage_group") != "not_checked"
+        and not finding_in_scope(finding, changed_files)
+    ]
+    return {
+        "excluded_total_count": len(excluded),
+        "excluded_low_confidence_count": sum(
+            1
+            for finding in excluded
+            if finding.get("mapping", {}).get("confidence") == "low"
+        ),
+    }
+
+
 def blocking_findings(
     report: dict,
     fail_on_severity: str = "serious",
@@ -200,6 +223,22 @@ def _display_location(finding: dict) -> str:
     return url or "(unmapped)"
 
 
+def _blocking_reason(
+    finding: dict,
+    baseline_present: bool,
+    fail_on_any_new: bool,
+    fail_on_manual_findings: bool,
+) -> str:
+    if baseline_present and fail_on_any_new and finding.get("comparison") == "new":
+        return "blocking because it is new and fail-on-any-new is enabled"
+    if finding.get("triage_group") == "manual_review" and fail_on_manual_findings:
+        return "blocking because manual-review findings are configured to fail CI"
+    return (
+        f"blocking because severity {finding.get('severity')} and confidence "
+        f"{finding.get('confidence')} meet the configured threshold"
+    )
+
+
 def render_pr_summary(
     report: dict,
     blockers: List[dict],
@@ -208,16 +247,20 @@ def render_pr_summary(
     fail_on_confidence: str = "high",
     fail_on_any_new: bool = False,
     fail_on_manual_findings: bool = False,
+    scope_metadata: Optional[dict] = None,
+    ci_mode: bool = True,
 ) -> str:
     changed_files = changed_files or set()
+    scope_metadata = scope_metadata or {}
     active_findings = [
         finding for finding in report.get("findings", [])
         if finding.get("status") == "open" and finding.get("triage_group") != "not_checked"
     ]
     non_blocking = [finding for finding in active_findings if finding not in blockers]
     summary = report.get("summary", {})
+    baseline_present = bool(report.get("baseline_comparison", {}).get("baseline_present"))
 
-    lines = ["## Accessibility CI Summary", ""]
+    lines = [("## Accessibility check" if ci_mode else "## Accessibility Summary"), ""]
     scope_label = "changed files only" if changed_files else "full report"
     if changed_files:
         lines.append(f"- Scope: {scope_label} ({len(changed_files)} file(s))")
@@ -226,9 +269,9 @@ def render_pr_summary(
     lines.append(f"- Active findings: {len(active_findings)}")
     lines.append(f"- Blocking findings: {len(blockers)}")
     lines.append(
-        f"- Groups: {summary.get('auto_fixable_count', 0)} auto-fixable, "
-        f"{summary.get('needs_input_count', 0)} need input, "
-        f"{summary.get('manual_review_count', 0)} manual review"
+        f"- Buckets: {summary.get('auto_fixable_count', 0)} safe to fix, "
+        f"{summary.get('needs_input_count', 0)} need decisions, "
+        f"{summary.get('manual_review_count', 0)} to review manually"
     )
     baseline_summary = report.get("baseline_comparison", {})
     if baseline_summary.get("baseline_present"):
@@ -240,9 +283,15 @@ def render_pr_summary(
         if baseline_parts:
             lines.append(f"- Regression summary: {', '.join(baseline_parts)}")
     lines.append(
-        f"- CI threshold: severity >= {fail_on_severity}, confidence >= {fail_on_confidence}, "
+        f"- {'Failing threshold' if ci_mode else 'Threshold'}: severity >= {fail_on_severity}, confidence >= {fail_on_confidence}, "
         f"any-new={'on' if fail_on_any_new else 'off'}, manual={'on' if fail_on_manual_findings else 'off'}"
     )
+    excluded_low_confidence_count = int(scope_metadata.get("excluded_low_confidence_count", 0) or 0)
+    if changed_files and excluded_low_confidence_count:
+        label = "finding" if excluded_low_confidence_count == 1 else "findings"
+        lines.append(
+            f"- Excluded from scope: {excluded_low_confidence_count} {label} with low-confidence mapping"
+        )
 
     if blockers:
         lines.extend(["", "### Blocking findings"])
@@ -250,7 +299,8 @@ def render_pr_summary(
             comparison = f"[{finding.get('comparison')}]" if finding.get("comparison") else ""
             lines.append(
                 f"- [{finding.get('severity')}/{finding.get('confidence')}][{finding.get('triage_group')}]{comparison} "
-                f"{finding.get('title')} — {_display_location(finding)}"
+                f"{finding.get('title')} — {_display_location(finding)} "
+                f"({_blocking_reason(finding, baseline_present, fail_on_any_new, fail_on_manual_findings)})"
             )
     elif not active_findings:
         lines.extend(["", "No active findings in scope."])
@@ -283,6 +333,7 @@ def main() -> int:
 
     report = load_report(args.report)
     changed_files = load_changed_files(args.changed_files)
+    scope_metadata = build_scope_metadata(report, changed_files)
     filtered = filter_report(report, changed_files)
     blockers = blocking_findings(
         filtered,
@@ -299,6 +350,8 @@ def main() -> int:
         fail_on_confidence=args.fail_on_confidence,
         fail_on_any_new=args.fail_on_any_new,
         fail_on_manual_findings=args.fail_on_manual_findings,
+        scope_metadata=scope_metadata,
+        ci_mode=True,
     )
     if args.summary_output:
         Path(args.summary_output).write_text(summary + "\n", encoding="utf-8")

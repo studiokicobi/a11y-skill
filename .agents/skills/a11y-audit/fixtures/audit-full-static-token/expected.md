@@ -2,24 +2,61 @@
 
 **Date**: <DATE>
 
-No active findings. Generated **6** guided checks for this target — say "give me the checklist" to walk through them, or "update the baseline" to refresh it.
+Found **2** active findings: **1** safe to fix now, **1** need your decision. Also generated **6** guided checks for this target.
 
 ## Snapshot
-- Target: fixtures/baseline-unstable-fallback
+- Target: fixtures/audit-full-static-token/source
 - Framework: html
 - Standard: WCAG 2.2 Level AA
-- Mode: triage
-- Checked: static
-- Baseline: stale 1
+- Mode: full
+- Checked: static, token
+- Findings by source: static 1, token 1
+- Baseline: none
+- Confidence: high 2
 Artifacts:
-- `triage-report.json`
+- `report.json`
+- `summary.md`
+- `manifest.json`
+- `scanners/static.json`
+- `scanners/tokens.json`
 
 ## What to do next
+- **Safe to fix now (1):** say "apply the safe fixes" and the agent will patch them.
+- **Needs your decision (1):** say "walk me through the decisions" to answer them one at a time.
 - **Test it yourself:** say "give me the checklist" — 6 guided checks for this target.
-- **Baseline:** say "update the baseline" so this clean run becomes the regression reference.
+- **Baseline:** say "save the baseline" to make this run the new reference.
 
-Tracked statuses: stale 1.
-Regression summary: stale 1.
+
+---
+
+## Safe to fix now (1)
+
+_The agent can apply these without further input. Say "apply the safe fixes" to proceed, or list which to skip._
+
+### 1. [WCAG 2.1.1] — Non-interactive element with click handler
+**Location**: `fixtures/audit-full-static-token/source/index.html:4`
+**Issue**: <div> with onClick is not keyboard-accessible. Use <button type="button"> or <a href> instead.
+**Fix**:
+```diff
+- <div onClick="saveDraft()">
++ <button type="button" onClick="saveDraft()">
+```
+
+---
+
+## Needs your decision (1)
+
+_Each item asks one question. Say "walk me through the decisions" and the agent will go one at a time._
+
+### 1. [WCAG 1.4.3] — Token contrast pair fails WCAG
+**Location**: `fixtures/audit-full-static-token/tokens.json:14`
+**Blast radius**: design-system wide
+**Issue**: Token pair body-muted resolves to #9aa0aa on #ffffff at 2.63:1, below the required 4.5:1 for text contrast. Blast radius: design-system wide. Nearby compliant foreground: #717781.
+**Decision needed**: Which nearby compliant token value should replace this failing pair?
+**Current code**:
+```
+{"background": "color.surface.default", "foreground": "color.text.muted", "id": "body-muted", "kind": "text", "scope": "design-system"}
+```
 
 ---
 
@@ -94,18 +131,6 @@ _These require a human in the browser or with assistive tech — the things auto
 **Expected result**:
 - [ ] Meaning is still clear without color perception.
 - [ ] Status and selection are conveyed with text, iconography, or structural cues in addition to color.
-
----
-
-## Resolved & tracked (1)
-
-These findings were carried from status records and are kept for tracking, not active remediation:
-
-### 1. [WCAG 2.1.1] — Non-interactive element with click handler
-**Location**: `fixtures/baseline-unstable-fallback/index.html:5`
-**Status**: stale
-**Baseline**: stale
-**Reason**: Rule is classified as safe to patch automatically for this evidence source.
 
 ---
 
