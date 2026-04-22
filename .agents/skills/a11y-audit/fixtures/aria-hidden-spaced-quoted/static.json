@@ -1,0 +1,23 @@
+{
+  "target": "/Users/colin/Sites/a11y-skill/.agents/skills/a11y-audit/fixtures/aria-hidden-spaced-quoted",
+  "framework": "html",
+  "files_scanned": 1,
+  "issue_count": 1,
+  "issues": [
+    {
+      "rule_id": "aria-hidden-focusable",
+      "wcag": "4.1.2",
+      "file": "/Users/colin/Sites/a11y-skill/.agents/skills/a11y-audit/fixtures/aria-hidden-spaced-quoted/button.html",
+      "line": 5,
+      "col": 3,
+      "snippet": "<button aria-hidden = 'true' onclick=\"ping()\">",
+      "message": "aria-hidden=\"true\" on focusable <button>. Remove aria-hidden or add tabindex=\"-1\".",
+      "framework": "html",
+      "triage_hint": "auto",
+      "fix_data": {
+        "element": "button",
+        "pattern": "fix_aria_hidden"
+      }
+    }
+  ]
+}

@@ -1,0 +1,28 @@
+{
+  "framework": "html",
+  "files_scanned": 1,
+  "issue_count": 3,
+  "issues": [
+    {
+      "rule_id": "clickable-div",
+      "wcag": "2.1.1",
+      "file": "fixtures/clickable-div-with-role/index.html",
+      "line": 13,
+      "triage_hint": "auto"
+    },
+    {
+      "rule_id": "clickable-div",
+      "wcag": "2.1.1",
+      "file": "fixtures/clickable-div-with-role/index.html",
+      "line": 17,
+      "triage_hint": "auto"
+    },
+    {
+      "rule_id": "clickable-div",
+      "wcag": "2.1.1",
+      "file": "fixtures/clickable-div-with-role/index.html",
+      "line": 20,
+      "triage_hint": "auto"
+    }
+  ]
+}

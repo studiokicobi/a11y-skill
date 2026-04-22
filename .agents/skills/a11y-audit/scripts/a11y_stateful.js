@@ -10,93 +10,28 @@
 
 const fs = require('fs');
 const path = require('path');
-const { execSync } = require('child_process');
 const { pathToFileURL } = require('url');
 
-const DEP_CACHE_DIR = path.join(__dirname, '..', '.a11y-audit-deps');
-const BROWSERS_DIR = path.join(DEP_CACHE_DIR, 'ms-playwright');
-
-function ensureDepCache() {
-  if (!fs.existsSync(DEP_CACHE_DIR)) {
-    fs.mkdirSync(DEP_CACHE_DIR, { recursive: true });
-  }
-  const packageJsonPath = path.join(DEP_CACHE_DIR, 'package.json');
-  if (!fs.existsSync(packageJsonPath)) {
-    fs.writeFileSync(
-      packageJsonPath,
-      JSON.stringify({ name: 'a11y-audit-deps', version: '1.0.0', private: true }, null, 2)
-    );
-  }
-  const nodeModulesDir = path.join(DEP_CACHE_DIR, 'node_modules');
-  if (!module.paths.includes(nodeModulesDir)) {
-    module.paths.unshift(nodeModulesDir);
-  }
-}
-
-function ensureDeps(required) {
-  ensureDepCache();
-
-  const missing = [];
-  for (const dep of required) {
-    try {
-      require.resolve(dep);
-    } catch {
-      missing.push(dep);
-    }
-  }
-  if (missing.length === 0) {
-    return;
-  }
-
-  console.error(`Installing required packages: ${missing.join(', ')}...`);
-  execSync(`npm install --no-audit --no-fund --loglevel=error ${missing.join(' ')}`, {
-    cwd: DEP_CACHE_DIR,
-    stdio: 'inherit',
-    env: {
-      ...process.env,
-      PLAYWRIGHT_BROWSERS_PATH: BROWSERS_DIR,
-    },
-  });
-
-  const nodeModulesDir = path.join(DEP_CACHE_DIR, 'node_modules');
-  if (!module.paths.includes(nodeModulesDir)) {
-    module.paths.unshift(nodeModulesDir);
-  }
-}
-
-function ensurePlaywrightBrowser(playwright) {
-  process.env.PLAYWRIGHT_BROWSERS_PATH = BROWSERS_DIR;
-  const executablePath = playwright.chromium.executablePath();
-  if (fs.existsSync(executablePath)) {
-    return;
-  }
-
-  const cliPath = path.join(DEP_CACHE_DIR, 'node_modules', '.bin', 'playwright');
-  if (!fs.existsSync(cliPath)) {
-    throw new Error('Playwright is installed but the CLI helper is missing.');
-  }
-
-  console.error('Installing Playwright Chromium browser...');
-  execSync(`${JSON.stringify(cliPath)} install chromium`, {
-    cwd: DEP_CACHE_DIR,
-    stdio: 'inherit',
-    env: {
-      ...process.env,
-      PLAYWRIGHT_BROWSERS_PATH: BROWSERS_DIR,
-    },
-  });
-}
-
-function normalizeWaitUntil(value) {
-  const normalized = String(value || 'networkidle').toLowerCase();
-  if (normalized === 'networkidle2') {
-    return 'networkidle';
-  }
-  if (!['load', 'domcontentloaded', 'networkidle', 'commit'].includes(normalized)) {
-    throw new Error(`Unsupported wait condition "${value}". Use load, domcontentloaded, networkidle, or commit.`);
-  }
-  return normalized;
-}
+const {
+  AXE_TO_STATIC_RULE,
+  AXE_TRIAGE_HINT,
+  RUNTIME_AXE_TAGS,
+  addScreenshot,
+  applyAuth,
+  applyRouteBlocking,
+  applyWaitConditions,
+  countAxeNodes,
+  ensureDeps,
+  ensurePlaywrightBrowser,
+  extractWcag,
+  formatError,
+  loadConfig,
+  normalizeWaitUntil,
+  requireFromCache,
+  resolveAuth,
+  resolvePath,
+  stringTarget,
+} = require('./a11y_runtime_common');
 
 function parseArgs(argv) {
   const args = {
@@ -131,116 +66,6 @@ function parseArgs(argv) {
     throw new Error('Provide --config with a JSON or YAML journey file.');
   }
   return args;
-}
-
-function resolvePath(baseDir, value) {
-  if (!value) {
-    return '';
-  }
-  return path.isAbsolute(value) ? value : path.resolve(baseDir, value);
-}
-
-function loadConfig(configPath) {
-  const absolutePath = path.resolve(process.cwd(), configPath);
-  if (!fs.existsSync(absolutePath)) {
-    throw new Error(`Journey config file not found: ${configPath}`);
-  }
-
-  const extension = path.extname(absolutePath).toLowerCase();
-  const raw = fs.readFileSync(absolutePath, 'utf-8');
-  if (extension === '.json') {
-    return { config: JSON.parse(raw), baseDir: path.dirname(absolutePath) };
-  }
-  if (extension === '.yaml' || extension === '.yml') {
-    ensureDeps(['yaml']);
-    const yaml = require('yaml');
-    return { config: yaml.parse(raw) || {}, baseDir: path.dirname(absolutePath) };
-  }
-  throw new Error('Journey config files must use .json, .yaml, or .yml.');
-}
-
-function resolveSecretValue(spec, label, baseDir) {
-  if (spec == null) {
-    throw new Error(`Missing value for ${label}.`);
-  }
-  if (typeof spec === 'string') {
-    if (spec.startsWith('env:')) {
-      const envName = spec.slice(4).trim();
-      const value = process.env[envName];
-      if (!value) {
-        throw new Error(`Missing environment variable referenced by ${label}: ${envName}.`);
-      }
-      return value;
-    }
-    if (spec.startsWith('file:')) {
-      const secretPath = resolvePath(baseDir, spec.slice(5).trim());
-      if (!fs.existsSync(secretPath)) {
-        throw new Error(`Missing secret file referenced by ${label}: ${path.basename(secretPath)}.`);
-      }
-      return fs.readFileSync(secretPath, 'utf-8').trim();
-    }
-    return spec;
-  }
-  if (typeof spec === 'object' && !Array.isArray(spec)) {
-    if (spec.env) {
-      return resolveSecretValue(`env:${spec.env}`, label, baseDir);
-    }
-    if (spec.file) {
-      return resolveSecretValue(`file:${spec.file}`, label, baseDir);
-    }
-    if (Object.prototype.hasOwnProperty.call(spec, 'value')) {
-      return String(spec.value);
-    }
-  }
-  throw new Error(`Unsupported secret reference for ${label}. Use env:, file:, or { env/file/value }.`);
-}
-
-function resolveAuth(authConfig, baseDir) {
-  if (!authConfig) {
-    return { mode: 'none' };
-  }
-
-  const mode = String(authConfig.mode || '').trim();
-  if (!mode) {
-    throw new Error('Auth config requires a non-empty mode.');
-  }
-
-  if (mode === 'storage_state') {
-    const storageStatePath = resolvePath(baseDir, authConfig.storage_state_path || '');
-    if (!storageStatePath || !fs.existsSync(storageStatePath)) {
-      throw new Error(
-        'Auth config mode "storage_state" requires an existing storage_state_path. ' +
-        'Refresh or provide the Playwright auth state file.'
-      );
-    }
-    return { mode, storageStatePath };
-  }
-
-  if (mode === 'headers') {
-    const headers = {};
-    const source = authConfig.headers || {};
-    for (const [headerName, valueSpec] of Object.entries(source)) {
-      headers[headerName] = resolveSecretValue(valueSpec, `auth.headers.${headerName}`, baseDir);
-    }
-    if (Object.keys(headers).length === 0) {
-      throw new Error('Auth config mode "headers" requires a non-empty headers object.');
-    }
-    return { mode, headers };
-  }
-
-  if (mode === 'cookies') {
-    const cookiesPath = resolvePath(baseDir, authConfig.cookies_path || '');
-    if (!cookiesPath || !fs.existsSync(cookiesPath)) {
-      throw new Error('Auth config mode "cookies" requires an existing cookies_path JSON file.');
-    }
-    const cookies = JSON.parse(fs.readFileSync(cookiesPath, 'utf-8'));
-    if (!Array.isArray(cookies)) {
-      throw new Error('Auth cookies file must contain a JSON array of Playwright cookies.');
-    }
-    return { mode, cookies };
-  }
-
-  throw new Error(`Unsupported auth mode "${mode}". Use storage_state, headers, or cookies.`);
 }
 
 function mergeConfig(baseConfig, overrideConfig) {
@@ -357,54 +182,6 @@ function buildJourneyPlans(args, config, configBaseDir) {
   });
 }
 
-function extractWcag(tags) {
-  for (const tag of tags || []) {
-    if (!/^wcag\d{3,}$/.test(tag)) {
-      continue;
-    }
-    const digits = tag.replace('wcag', '');
-    return `${digits[0]}.${digits[1]}.${digits.slice(2)}`;
-  }
-
-  return (tags || [])
-    .filter((tag) => /^wcag\d/.test(tag))
-    .map((tag) => tag.replace('wcag', ''))
-    .find((tag) => /^\d/.test(tag)) || '';
-}
-
-function stringTarget(target) {
-  return Array.isArray(target) ? target.join(' > ') : String(target || '');
-}
-
-const AXE_TO_STATIC_RULE = {
-  'image-alt': 'img-missing-alt',
-  'label': 'input-missing-label',
-  'html-has-lang': 'html-missing-lang',
-  'aria-hidden-focus': 'aria-hidden-focusable',
-  'link-in-text-block': 'link-in-text-block',
-  'duplicate-id': 'duplicate-id',
-  'tabindex': 'positive-tabindex',
-};
-
-const AXE_TRIAGE_HINT = {
-  'image-alt': 'input',
-  'label': 'input',
-  'color-contrast': 'input',
-  'html-has-lang': 'auto',
-  'aria-hidden-focus': 'auto',
-  'duplicate-id': 'auto',
-  'tabindex': 'input',
-  'region': 'manual',
-  'landmark-one-main': 'manual',
-  'page-has-heading-one': 'manual',
-  'heading-order': 'input',
-  'focus-order-semantics': 'manual',
-};
-
-function countAxeNodes(results) {
-  return (results || []).reduce((sum, item) => sum + ((item.nodes || []).length), 0);
-}
-
 function slugify(value) {
   return String(value || '')
     .toLowerCase()
@@ -424,14 +201,6 @@ function checkpointScreenshotPath(screenshotDir, journeyId, stepId, checkpointIn
   );
 }
 
-function addScreenshot(issue, screenshotPath) {
-  if (!screenshotPath) {
-    return issue;
-  }
-  issue.fix_data.screenshot = screenshotPath;
-  return issue;
-}
-
 function mapAxeNodes(resultType, axeItem, pageUrl, screenshotPath, journeyId, stepId, checkpointId) {
   const issues = [];
   for (const node of axeItem.nodes || []) {
@@ -448,11 +217,13 @@ function mapAxeNodes(resultType, axeItem, pageUrl, screenshotPath, journeyId, st
         ? `${axeItem.help} (needs manual verification)`
         : axeItem.help,
       framework: 'stateful',
+      // Unknown axe rules default to 'input' (needs a human decision). We
+      // should never autofix a rule we haven't explicitly vetted — severity
+      // alone isn't a safety signal. Every 'auto' rule is an opt-in entry
+      // in AXE_TRIAGE_HINT with a matching fix template in triage.render_fix.
       triage_hint: resultType === 'incomplete'
         ? 'input'
-        : (AXE_TRIAGE_HINT[axeItem.id] || (
-          axeItem.impact === 'critical' || axeItem.impact === 'serious' ? 'auto' : 'input'
-        )),
+        : (AXE_TRIAGE_HINT[axeItem.id] || 'input'),
       journey_step_id: stepId,
       fix_data: {
         axe_rule: axeItem.id,
@@ -484,37 +255,6 @@ function mapAxePasses(result, pageUrl, journeyId, stepId, checkpointId) {
   }));
 }
 
-async function applyWaitConditions(page, config) {
-  const waitFor = config.wait_for || {};
-  const timeout = config.timeout;
-  if (waitFor.selector) {
-    await page.waitForSelector(waitFor.selector, { state: 'visible', timeout });
-  }
-  if (waitFor.hidden_selector) {
-    await page.waitForSelector(waitFor.hidden_selector, { state: 'hidden', timeout });
-  }
-  if (waitFor.load_state) {
-    await page.waitForLoadState(normalizeWaitUntil(waitFor.load_state), { timeout });
-  }
-  if (waitFor.timeout_ms) {
-    await page.waitForTimeout(parseInt(waitFor.timeout_ms, 10));
-  }
-}
-
-async function applyAuth(context, auth) {
-  if (auth.mode === 'headers') {
-    await context.setExtraHTTPHeaders(auth.headers);
-  } else if (auth.mode === 'cookies') {
-    await context.addCookies(auth.cookies);
-  }
-}
-
-async function applyRouteBlocking(page, routeBlocklist) {
-  for (const pattern of routeBlocklist || []) {
-    await page.route(pattern, (route) => route.abort());
-  }
-}
-
 async function describeActiveElement(page) {
   return page.evaluate(() => {
     const el = document.activeElement;
@@ -539,21 +279,13 @@ async function describeActiveElement(page) {
 
 async function runCheckpoint(page, journey, step, axeSource, checkpointIndex) {
   await page.addScriptTag({ content: axeSource });
-  const result = await page.evaluate(async () => {
+  const result = await page.evaluate(async (runOnlyTags) => {
     /* global axe */
     return axe.run(document, {
-      runOnly: {
-        type: 'tag',
-        values: [
-          'wcag2a', 'wcag2aa',
-          'wcag21a', 'wcag21aa',
-          'wcag22a', 'wcag22aa',
-          'best-practice',
-        ],
-      },
+      runOnly: { type: 'tag', values: runOnlyTags },
       resultTypes: ['violations', 'incomplete', 'passes'],
     });
-  });
+  }, RUNTIME_AXE_TAGS);
 
   const screenshotPath = checkpointScreenshotPath(
     journey.screenshot ? journey.screenshot_dir : '',
@@ -768,13 +500,9 @@ async function runJourney(browser, journey, auth, axeSource, baseDir) {
   }
 }
 
-function formatError(err) {
-  return err && err.message ? err.message : String(err);
-}
-
 async function main() {
   const args = parseArgs(process.argv);
-  const { config, baseDir } = loadConfig(args.config);
+  const { config, baseDir } = loadConfig(args.config, { kind: 'journey' });
   const auth = resolveAuth(config.auth, baseDir);
   const journeys = buildJourneyPlans(args, config, baseDir);
 
@@ -784,9 +512,12 @@ async function main() {
   }
 
   ensureDeps(['playwright', 'axe-core']);
-  const playwright = require('playwright');
+  // Load deps via the cache-bound `requireFromCache` so the caller module
+  // doesn't need to find `.a11y-audit-deps/node_modules` via its own
+  // `module.paths` walk. See a11y_runtime_common.js for why this matters.
+  const playwright = requireFromCache('playwright');
   ensurePlaywrightBrowser(playwright);
-  const axeSource = fs.readFileSync(require.resolve('axe-core/axe.min.js'), 'utf-8');
+  const axeSource = fs.readFileSync(requireFromCache.resolve('axe-core/axe.min.js'), 'utf-8');
 
   const browser = await playwright.chromium.launch({
     headless: true,

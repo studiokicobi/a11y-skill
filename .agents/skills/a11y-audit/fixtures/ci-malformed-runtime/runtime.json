@@ -1,0 +1,13 @@
+{
+  "issues": [
+    {
+      "rule_id": "color-contrast",
+      "wcag": "1.4.3",
+      "file": "http://example.test/checkout",
+      "line": 0,
+      "col": 0,
+      "snippet": "<span class=\"price-badge\">$9</span>",
+      "message": "Elements must meet minimum color contrast ratio thresholds."
+    }
+  ]
+}

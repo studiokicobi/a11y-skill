@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head><meta charset="utf-8"><title>Clickable div regression</title></head>
+  <body>
+    <!-- Should NOT flag: role="button" + tabindex="0" is the documented
+         pattern for custom interactive controls and is keyboard-accessible. -->
+    <div role="button" tabindex="0" onclick="doThing()">Submit</div>
+
+    <!-- Should NOT flag: role="link" + tabindex is also accessible. -->
+    <span role="link" tabindex="0" onclick="nav()">Open profile</span>
+
+    <!-- SHOULD flag: role="button" but no tabindex (not focusable). -->
+    <div role="button" onclick="stillBroken()">Missing tabindex</div>
+
+    <!-- SHOULD flag: tabindex but no interactive role (focusable but not
+         announced as a button to assistive tech). -->
+    <div tabindex="0" onclick="alsoBroken()">Missing role</div>
+
+    <!-- SHOULD flag: plain div with onClick, no tabindex, no role. -->
+    <div onclick="plainDiv()">Plain div</div>
+  </body>
+</html>

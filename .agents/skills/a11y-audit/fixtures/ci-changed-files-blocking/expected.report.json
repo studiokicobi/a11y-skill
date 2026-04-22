@@ -91,7 +91,7 @@
       },
       "proposed_fix": {
         "kind": "diff",
-        "diff": "```diff\n- <button data-source-file=\"src/components/CheckoutButton.tsx\" data-source-line=\"42\" aria-hidden=\"true\">Pay</button>\n+ <button data-source-file=\"src/components/CheckoutButton.tsx\" data-source-line=\"42\" >Pay</button>\n```",
+        "diff": "```diff\n- <button data-source-file=\"src/components/CheckoutButton.tsx\" data-source-line=\"42\" aria-hidden=\"true\">Pay</button>\n+ <button data-source-file=\"src/components/CheckoutButton.tsx\" data-source-line=\"42\">Pay</button>\n```",
         "notes": ""
       },
       "fingerprint": "aria-hidden-focusable|#pay-button|http://example.test/checkout",

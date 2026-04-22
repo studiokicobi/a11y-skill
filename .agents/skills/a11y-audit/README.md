@@ -41,7 +41,9 @@ Restart Codex after installation.
 
 ### Claude.ai
 
-Upload the `.skill` archive via Settings → Skills.
+Download the `a11y-audit.skill` asset from the [latest GitHub Release](https://github.com/studiokicobi/a11y-skill/releases/latest) and upload it via Settings → Skills.
+
+Prefer building from source? Run `scripts/pack.sh` at the repo root to produce a fresh `dist/a11y-audit.skill` from the unpacked tree.
 
 ## Usage
 
@@ -164,8 +166,8 @@ python3 scripts/triage.py --static /tmp/static.json --tokens /tmp/tokens.json --
 # Or build a baseline from an existing normalized report
 python3 scripts/baseline.py --report report.json --output baseline.json
 
-# Render a CI/PR summary and use CI exit codes
-python3 scripts/cli.py --static /tmp/static.json --runtime /tmp/runtime.json --baseline-file baseline.json --pr-summary-output pr-summary.md --ci
+# Render a CI/PR summary and use CI exit codes (summary written to <output-dir>/summary.md)
+python3 scripts/cli.py ci --static /tmp/static.json --runtime /tmp/runtime.json --baseline-file baseline.json --output-dir /tmp/a11y-ci --ci
 
 # Render a PR summary from an existing normalized report
 python3 scripts/report.py --report report.json --summary-output pr-summary.md --ci
@@ -220,7 +222,7 @@ Runtime and stateful findings now carry a `mapping` object with confidence and e
 `cli.py ci` adds CI-oriented behavior:
 
 - `--changed-files` scopes the report to the listed source files using `mapping.source_file` or direct source locations.
-- `--pr-summary-output` writes GitHub-friendly markdown.
+- `--output-dir` collects the full artifact set (`report.json`, `report.md`, `summary.md`, `manifest.json`, raw scanner inputs) in one directory; `summary.md` is the GitHub-friendly PR summary.
 - `--ci` returns deterministic exit codes:
   - `0` no blocking findings
   - `1` blocking findings at the configured threshold

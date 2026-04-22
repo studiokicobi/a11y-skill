@@ -29,6 +29,7 @@ from report import (
 from triage import (
     _build_message_lookup,
     _now_iso,
+    _validate_scanner_payload,
     build_markdown_report,
     build_outcome_summary,
     build_report_data,
@@ -44,12 +45,6 @@ RUNTIME_SCANNER = SCRIPT_DIR / "a11y_runtime.js"
 STATEFUL_SCANNER = SCRIPT_DIR / "a11y_stateful.js"
 TOKEN_SCANNER = SCRIPT_DIR / "tokens.py"
 DEFAULT_ARTIFACT_ROOT = Path(".artifacts") / "a11y"
-
-
-def _load_json(path_str: Optional[str]) -> Optional[dict]:
-    if not path_str:
-        return None
-    return json.loads(Path(path_str).read_text(encoding="utf-8"))
 
 
 def _raw_issues(
@@ -134,6 +129,26 @@ def _run_command(cmd: List[str], label: str) -> None:
 def _copy_json_input(source: Path, dest: Path) -> dict:
     shutil.copyfile(source, dest)
     return json.loads(dest.read_text(encoding="utf-8"))
+
+
+def _ingest_scanner_input(source: Path, dest: Path, scanner: str) -> dict:
+    """Validate a scanner JSON input, then copy it to the artifact tree.
+
+    Uses the same shape/contract checks as `triage.py --static/--runtime/...`
+    so ci and triage refuse the same malformed or mislabeled payloads.
+    Validation failures are re-raised as RuntimeError to flow through
+    cli.py's existing `Configuration error:` exit-2 path.
+    """
+    try:
+        data = _validate_scanner_payload(str(source), scanner)
+    except ValueError as exc:
+        raise RuntimeError(str(exc)) from exc
+    if data is None:
+        # `_validate_scanner_payload` only returns None when the path is
+        # empty; callers guard this, but keep a safety net.
+        raise RuntimeError(f"--{scanner} path is empty")
+    shutil.copyfile(source, dest)
+    return data
 
 
 def _copy_named_input(source: Optional[str], dest_dir: Path, dest_name: str) -> Optional[str]:
@@ -280,7 +295,19 @@ def _render_outputs(
 
     raw_issues = _raw_issues(static_data, runtime_data, stateful_data, token_data)
     message_lookup = _build_message_lookup(raw_issues)
-    manual_items = generate_manual_review_items(report, stateful_data)
+    scanners_ran_for_checklist = [
+        scanner
+        for scanner, payload in (
+            ("static", static_data),
+            ("runtime", runtime_data),
+            ("stateful", stateful_data),
+            ("token", token_data),
+        )
+        if payload
+    ]
+    manual_items = generate_manual_review_items(
+        report, stateful_data, scanners_ran=scanners_ran_for_checklist
+    )
     step_failures = list((stateful_data or {}).get("step_failures", []))
     render_context = _build_render_context(
         mode_label,
@@ -362,6 +389,7 @@ def _write_manifest(
     input_copies: Dict[str, str],
     scope_metadata: dict,
     baseline_output: Optional[str] = None,
+    outcome: Optional[dict] = None,
 ) -> None:
     artifacts = {
         "report_markdown": "report.md",
@@ -396,6 +424,8 @@ def _write_manifest(
     }
     if baseline_output:
         manifest["baseline_output"] = baseline_output
+    if outcome:
+        manifest["outcome"] = outcome
     manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
 
 
@@ -445,27 +475,6 @@ def _build_public_parser() -> argparse.ArgumentParser:
         if getattr(action, "dest", None) != "promote-baseline"
     ]
 
-    return parser
-
-
-def _legacy_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Accessibility CI/PR report orchestrator")
-    parser.add_argument("--static", type=str, help="Path to static scanner JSON")
-    parser.add_argument("--runtime", type=str, help="Path to runtime scanner JSON")
-    parser.add_argument("--stateful", type=str, help="Path to stateful scanner JSON")
-    parser.add_argument("--tokens", type=str, help="Path to token scanner JSON")
-    parser.add_argument("--baseline-file", type=str, help="Optional baseline JSON")
-    parser.add_argument("--status-file", type=str, help="Optional status/waiver JSON")
-    parser.add_argument("--output", type=str, help="Optional markdown report output")
-    parser.add_argument("--json-output", type=str, help="Optional normalized JSON output")
-    parser.add_argument("--pr-summary-output", type=str, help="Optional PR summary markdown output")
-    parser.add_argument("--changed-files", type=str, help="Optional newline-delimited changed files list")
-    parser.add_argument("--detected-at", type=str, help="ISO timestamp override")
-    parser.add_argument("--ci", action="store_true", help="Return CI exit codes")
-    parser.add_argument("--fail-on-severity", choices=("minor", "moderate", "serious", "critical"), default="serious")
-    parser.add_argument("--fail-on-confidence", choices=("low", "medium", "high"), default="high")
-    parser.add_argument("--fail-on-any-new", action="store_true")
-    parser.add_argument("--fail-on-manual-findings", action="store_true")
     return parser
 
 
@@ -527,12 +536,16 @@ def _collect_ci_payloads(args, paths: Dict[str, Path]) -> Dict[str, Optional[dic
     }
 
     if args.static:
-        payloads["static"] = _copy_json_input(Path(args.static).resolve(), paths["scanners"] / "static.json")
+        payloads["static"] = _ingest_scanner_input(
+            Path(args.static).resolve(), paths["scanners"] / "static.json", "static"
+        )
     elif args.path:
         payloads["static"] = _run_static_scan(args.path, paths["scanners"] / "static.json", args.framework)
 
     if args.runtime:
-        payloads["runtime"] = _copy_json_input(Path(args.runtime).resolve(), paths["scanners"] / "runtime.json")
+        payloads["runtime"] = _ingest_scanner_input(
+            Path(args.runtime).resolve(), paths["scanners"] / "runtime.json", "runtime"
+        )
     elif args.url or args.runtime_config:
         payloads["runtime"] = _run_runtime_scan(
             args.url,
@@ -542,7 +555,9 @@ def _collect_ci_payloads(args, paths: Dict[str, Path]) -> Dict[str, Optional[dic
         )
 
     if args.stateful:
-        payloads["stateful"] = _copy_json_input(Path(args.stateful).resolve(), paths["scanners"] / "stateful.json")
+        payloads["stateful"] = _ingest_scanner_input(
+            Path(args.stateful).resolve(), paths["scanners"] / "stateful.json", "stateful"
+        )
     elif args.journey_config:
         payloads["stateful"] = _run_stateful_scan(
             args.journey_config,
@@ -551,7 +566,9 @@ def _collect_ci_payloads(args, paths: Dict[str, Path]) -> Dict[str, Optional[dic
         )
 
     if args.tokens:
-        payloads["tokens"] = _copy_json_input(Path(args.tokens).resolve(), paths["scanners"] / "tokens.json")
+        payloads["tokens"] = _ingest_scanner_input(
+            Path(args.tokens).resolve(), paths["scanners"] / "tokens.json", "token"
+        )
     elif args.token_file:
         payloads["tokens"] = _run_token_scan(args.token_file, paths["scanners"] / "tokens.json")
 
@@ -641,6 +658,13 @@ def _audit_main(argv: List[str]) -> int:
         )
         baseline_output_display = _display_path(baseline_output_path)
 
+    outcome_summary = outputs["outcome_summary"]
+    recommended_first_step = _recommended_first_step(outcome_summary)
+    outcome_payload = {
+        "body": outcome_summary["outcome_body"],
+        "recommended_first_step": recommended_first_step or "",
+    }
+
     _write_manifest(
         paths["manifest_json"],
         run_kind="audit",
@@ -652,12 +676,11 @@ def _audit_main(argv: List[str]) -> int:
         input_copies=input_copies,
         scope_metadata=outputs["scope_metadata"],
         baseline_output=baseline_output_display,
+        outcome=outcome_payload,
     )
 
-    outcome_summary = outputs["outcome_summary"]
     print(outcome_summary["outcome_body"])
     print(f"Full report: {_display_path(paths['report_md'])}")
-    recommended_first_step = _recommended_first_step(outcome_summary)
     if recommended_first_step:
         print(recommended_first_step)
     if baseline_output_display:
@@ -750,76 +773,6 @@ def _promote_baseline_main(argv: List[str]) -> int:
     return 0
 
 
-def _legacy_main(argv: List[str]) -> int:
-    parser = _legacy_parser()
-    args = parser.parse_args(argv)
-
-    if not (args.static or args.runtime or args.stateful or args.tokens):
-        print("Error: provide at least one of --static, --runtime, --stateful, or --tokens", file=sys.stderr)
-        return 2
-
-    try:
-        static_data = _load_json(args.static)
-        runtime_data = _load_json(args.runtime)
-        stateful_data = _load_json(args.stateful)
-        token_data = _load_json(args.tokens)
-        status_records = load_status_records(args.status_file)
-        changed_files = load_changed_files(args.changed_files)
-    except FileNotFoundError as exc:
-        print(f"Configuration error: {exc}", file=sys.stderr)
-        return 2
-    except json.JSONDecodeError as exc:
-        print(f"Configuration error: {exc}", file=sys.stderr)
-        return 2
-
-    baseline_data, baseline_error = _load_baseline_or_error(args.baseline_file)
-    if baseline_error:
-        print(baseline_error[1], file=sys.stderr)
-        return baseline_error[0]
-
-    detected_at = args.detected_at or _now_iso()
-    output_dir = (Path(args.output or args.json_output or args.pr_summary_output).parent.resolve()
-                  if (args.output or args.json_output or args.pr_summary_output)
-                  else Path.cwd().resolve())
-    artifact_paths = []
-    if args.json_output:
-        artifact_paths.append(Path(args.json_output).name)
-    if args.pr_summary_output:
-        artifact_paths.append(Path(args.pr_summary_output).name)
-    outputs = _render_outputs(
-        static_data,
-        runtime_data,
-        stateful_data,
-        token_data,
-        baseline_data,
-        status_records,
-        changed_files,
-        detected_at,
-        output_dir,
-        "legacy",
-        artifact_paths,
-        fail_on_severity=args.fail_on_severity,
-        fail_on_confidence=args.fail_on_confidence,
-        fail_on_any_new=args.fail_on_any_new,
-        fail_on_manual_findings=args.fail_on_manual_findings,
-        ci_mode=True,
-    )
-
-    if args.output:
-        Path(args.output).write_text(outputs["markdown"], encoding="utf-8")
-    if args.json_output:
-        Path(args.json_output).write_text(json.dumps(outputs["report"], indent=2) + "\n", encoding="utf-8")
-    if args.pr_summary_output:
-        Path(args.pr_summary_output).write_text(outputs["summary"] + "\n", encoding="utf-8")
-
-    if not (args.output or args.json_output or args.pr_summary_output):
-        print(outputs["summary"])
-
-    if args.ci:
-        return 1 if outputs["blockers"] else 0
-    return 0
-
-
 def main(argv: Optional[List[str]] = None) -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
     if not argv:
@@ -830,14 +783,12 @@ def main(argv: Optional[List[str]] = None) -> int:
         return 0
     if argv[0] == "audit":
         return _audit_main(argv)
-    if argv and argv[0] == "ci":
+    if argv[0] == "ci":
         return _ci_main(argv)
-    if argv and argv[0] == "promote-baseline":
+    if argv[0] == "promote-baseline":
         return _promote_baseline_main(argv)
-    if argv and not argv[0].startswith("-"):
-        _build_public_parser().parse_args(argv)
-        return 0
-    return _legacy_main(argv)
+    _build_public_parser().parse_args(argv)
+    return 0
 
 
 if __name__ == "__main__":

@@ -1,0 +1,36 @@
+{
+  "target": "/Users/colin/Sites/a11y-skill/.agents/skills/a11y-audit/fixtures/target-blank-spaced",
+  "framework": "html",
+  "files_scanned": 1,
+  "issue_count": 2,
+  "issues": [
+    {
+      "rule_id": "target-blank-no-noopener",
+      "wcag": "best-practice",
+      "file": "/Users/colin/Sites/a11y-skill/.agents/skills/a11y-audit/fixtures/target-blank-spaced/links.html",
+      "line": 5,
+      "col": 3,
+      "snippet": "<a href=\"https://example.com\" target = \"_blank\">",
+      "message": "target=\"_blank\" without rel=\"noopener noreferrer\". Security and sometimes accessibility issue.",
+      "framework": "html",
+      "triage_hint": "auto",
+      "fix_data": {
+        "pattern": "add_rel_noopener"
+      }
+    },
+    {
+      "rule_id": "target-blank-no-noopener",
+      "wcag": "best-practice",
+      "file": "/Users/colin/Sites/a11y-skill/.agents/skills/a11y-audit/fixtures/target-blank-spaced/links.html",
+      "line": 6,
+      "col": 3,
+      "snippet": "<a href=\"https://other.test\" target=\"_blank\" rel=\"nofollow\">",
+      "message": "target=\"_blank\" without rel=\"noopener noreferrer\". Security and sometimes accessibility issue.",
+      "framework": "html",
+      "triage_hint": "auto",
+      "fix_data": {
+        "pattern": "add_rel_noopener"
+      }
+    }
+  ]
+}

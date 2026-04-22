@@ -1,0 +1,21 @@
+{
+  "framework": "html",
+  "files_scanned": 1,
+  "issue_count": 2,
+  "issues": [
+    {
+      "rule_id": "duplicate-id",
+      "wcag": "4.1.1",
+      "file": "fixtures/duplicate-id/index.html",
+      "line": 10,
+      "triage_hint": "auto"
+    },
+    {
+      "rule_id": "duplicate-id",
+      "wcag": "4.1.1",
+      "file": "fixtures/duplicate-id/index.html",
+      "line": 12,
+      "triage_hint": "auto"
+    }
+  ]
+}

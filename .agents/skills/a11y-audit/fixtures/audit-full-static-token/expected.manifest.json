@@ -11,7 +11,7 @@
     "needs_input_count": 1,
     "manual_review_count": 0,
     "waived_count": 0,
-    "not_checked_count": 9,
+    "not_checked_count": 29,
     "by_scanner": {
       "static": 1,
       "runtime": 0,
@@ -63,5 +63,9 @@
   "scanners_ran": [
     "static",
     "tokens"
-  ]
+  ],
+  "outcome": {
+    "body": "Found 2 active findings: 1 safe to fix now, 1 need your decision. Also generated 7 guided checks for this target.",
+    "recommended_first_step": "Recommended first step: say \"apply the safe fixes\". Open the report for all available next actions."
+  }
 }

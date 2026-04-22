@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>Duplicate id fixture</title>
+</head>
+<body>
+  <section id="content">
+    <h1>Article</h1>
+    <p id="lead">First paragraph.</p>
+    <p id="lead">Second paragraph reusing the lead id.</p>
+  </section>
+  <aside id="content">
+    <p>Reusing the section id breaks assistive tech targeting.</p>
+  </aside>
+</body>
+</html>

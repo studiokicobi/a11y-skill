@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>Icon-only control fixture</title>
+</head>
+<body>
+  <!-- Should flag: icon-only button with no accessible name. -->
+  <button type="button">
+    <svg viewBox="0 0 24 24" width="16" height="16"><path d="M6 6l12 12M6 18L18 6"/></svg>
+  </button>
+
+  <!-- Should flag: icon-only anchor with href and no accessible name. -->
+  <a href="/search">
+    <svg viewBox="0 0 24 24" width="16" height="16"><circle cx="11" cy="11" r="6"/></svg>
+  </a>
+
+  <!-- Should NOT flag: aria-label provides the accessible name. -->
+  <button type="button" aria-label="Close dialog">
+    <svg viewBox="0 0 24 24" width="16" height="16"><path d="M6 6l12 12M6 18L18 6"/></svg>
+  </button>
+
+  <!-- Should NOT flag: visible text sits next to the icon. -->
+  <button type="button">
+    <svg viewBox="0 0 24 24" width="16" height="16"><circle cx="11" cy="11" r="6"/></svg>
+    Search
+  </button>
+
+  <!-- Should NOT flag: visually-hidden label text. -->
+  <button type="button">
+    <svg viewBox="0 0 24 24" width="16" height="16"><path d="M12 3v18"/></svg>
+    <span class="sr-only">Open menu</span>
+  </button>
+</body>
+</html>

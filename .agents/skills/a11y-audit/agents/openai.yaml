@@ -15,30 +15,37 @@ policy:
   allow_implicit_invocation: true
 
 dependencies:
-  # Static scanner and triage are Python stdlib only.
-  # Runtime scanner needs Node.js, Puppeteer (downloads a Chromium build on
-  # first install), and axe-core. The runtime script auto-installs these into
-  # a local .a11y-audit-deps/ directory on first use, so no manual setup is
-  # required, but the host needs Node and npm available.
+  # Static scanner, tokens scanner, and triage are Python stdlib only.
+  # Runtime (a11y_runtime.js) and stateful (a11y_stateful.js) scanners need
+  # Node.js, Playwright (downloads Chromium on first install), axe-core, and
+  # yaml (for --config .yaml journey files). The scripts auto-install these
+  # into a local .a11y-audit-deps/ directory on first use, so no manual setup
+  # is required, but the host needs Node and npm available.
   runtimes:
     - type: python
       min_version: "3.8"
-      reason: "Static scanner (a11y_scan.py), triage (triage.py), contrast checker (contrast_checker.py). Uses standard library only."
+      reason: "Static scanner (a11y_scan.py), tokens scanner (tokens.py), triage (triage.py), contrast checker (contrast_checker.py). Uses standard library only."
 
     - type: node
       min_version: "18"
       optional: true
-      reason: "Runtime scanner (a11y_runtime.js). Only needed when auditing live URLs; static scans work without Node."
+      reason: "Runtime scanner (a11y_runtime.js) and stateful runner (a11y_stateful.js). Only needed when auditing live URLs or multi-step journeys; static scans work without Node."
 
   packages:
     - type: npm
-      name: puppeteer
+      name: playwright
       optional: true
       auto_install: true
-      reason: "Headless Chromium driver for the runtime scan. Auto-installed on first run of a11y_runtime.js into .a11y-audit-deps/."
+      reason: "Headless Chromium driver for the runtime and stateful scans. Auto-installed on first run into .a11y-audit-deps/ along with the Chromium binary."
 
     - type: npm
       name: axe-core
       optional: true
       auto_install: true
-      reason: "WCAG rule engine injected into the page by the runtime scanner. Auto-installed alongside Puppeteer."
+      reason: "WCAG rule engine injected into the page by the runtime and stateful scanners. Auto-installed alongside Playwright."
+
+    - type: npm
+      name: yaml
+      optional: true
+      auto_install: true
+      reason: "Parser for YAML journey configs passed via --config. Auto-installed on first run of a11y_runtime.js or a11y_stateful.js when a .yaml/.yml config is supplied."

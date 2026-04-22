@@ -1,0 +1,21 @@
+{
+  "framework": "html",
+  "files_scanned": 1,
+  "issue_count": 2,
+  "issues": [
+    {
+      "rule_id": "icon-only-control",
+      "wcag": "4.1.2",
+      "file": "fixtures/icon-only-control/index.html",
+      "line": 8,
+      "triage_hint": "input"
+    },
+    {
+      "rule_id": "icon-only-control",
+      "wcag": "4.1.2",
+      "file": "fixtures/icon-only-control/index.html",
+      "line": 13,
+      "triage_hint": "input"
+    }
+  ]
+}

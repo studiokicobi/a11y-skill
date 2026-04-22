@@ -10,7 +10,7 @@
     "needs_input_count": 1,
     "manual_review_count": 0,
     "waived_count": 0,
-    "not_checked_count": 9,
+    "not_checked_count": 29,
     "by_scanner": {
       "static": 0,
       "runtime": 2,
@@ -40,10 +40,30 @@
       "1.2.3",
       "1.2.4",
       "1.2.5",
-      "1.4.2",
+      "1.3.2",
+      "1.3.3",
+      "1.3.4",
+      "1.3.5",
+      "1.4.13",
+      "1.4.5",
+      "2.1.4",
       "2.2.1",
       "2.2.2",
-      "2.3.1"
+      "2.3.1",
+      "2.4.5",
+      "2.5.1",
+      "2.5.2",
+      "2.5.4",
+      "3.1.2",
+      "3.2.1",
+      "3.2.2",
+      "3.2.3",
+      "3.2.4",
+      "3.2.6",
+      "3.3.3",
+      "3.3.4",
+      "3.3.7",
+      "3.3.8"
     ]
   },
   "baseline_comparison": {
@@ -101,7 +121,7 @@
       },
       "proposed_fix": {
         "kind": "diff",
-        "diff": "```diff\n- <button data-source-file=\"src/components/CheckoutButton.tsx\" data-source-line=\"42\" data-source-column=\"7\" aria-hidden=\"true\">Pay</button>\n+ <button data-source-file=\"src/components/CheckoutButton.tsx\" data-source-line=\"42\" data-source-column=\"7\" >Pay</button>\n```",
+        "diff": "```diff\n- <button data-source-file=\"src/components/CheckoutButton.tsx\" data-source-line=\"42\" data-source-column=\"7\" aria-hidden=\"true\">Pay</button>\n+ <button data-source-file=\"src/components/CheckoutButton.tsx\" data-source-line=\"42\" data-source-column=\"7\">Pay</button>\n```",
         "notes": ""
       },
       "fingerprint": "aria-hidden-focusable|#pay-button|http://example.test/checkout",
@@ -225,13 +245,67 @@
       "notes": "Media asset review required."
     },
     {
-      "rule_id": "not-checked-1-4-2",
-      "title": "Audio Control",
+      "rule_id": "not-checked-1-3-2",
+      "title": "Meaningful Sequence",
       "wcag": [
-        "1.4.2"
+        "1.3.2"
       ],
       "status": "open",
-      "notes": "Static autoplay checks are partial and do not verify controls."
+      "notes": "The checklist exercises tab order (2.4.3); programmatic reading-sequence review is not automated."
+    },
+    {
+      "rule_id": "not-checked-1-3-3",
+      "title": "Sensory Characteristics",
+      "wcag": [
+        "1.3.3"
+      ],
+      "status": "open",
+      "notes": "Non-color sensory cues (shape, size, orientation, sound) are not exercised by the checklist."
+    },
+    {
+      "rule_id": "not-checked-1-3-4",
+      "title": "Orientation",
+      "wcag": [
+        "1.3.4"
+      ],
+      "status": "open",
+      "notes": "Portrait/landscape lock review not automated; 1.4.10 reflow is separate."
+    },
+    {
+      "rule_id": "not-checked-1-3-5",
+      "title": "Identify Input Purpose",
+      "wcag": [
+        "1.3.5"
+      ],
+      "status": "open",
+      "notes": "No autocomplete rule is implemented; user must review `autocomplete` attributes on personal-data fields."
+    },
+    {
+      "rule_id": "not-checked-1-4-13",
+      "title": "Content on Hover or Focus",
+      "wcag": [
+        "1.4.13"
+      ],
+      "status": "open",
+      "notes": "Hoverable/focusable revealed content (tooltips, popovers) is not exercised by the checklist."
+    },
+    {
+      "rule_id": "not-checked-1-4-5",
+      "title": "Images of Text",
+      "wcag": [
+        "1.4.5"
+      ],
+      "status": "open",
+      "notes": "Image-of-text detection is not automated; the checklist doesn't exercise it."
+    },
+    {
+      "rule_id": "not-checked-2-1-4",
+      "title": "Character Key Shortcuts",
+      "wcag": [
+        "2.1.4"
+      ],
+      "status": "open",
+      "notes": "Single-character shortcuts are not audited automatically."
     },
     {
       "rule_id": "not-checked-2-2-1",
@@ -240,7 +314,7 @@
         "2.2.1"
       ],
       "status": "open",
-      "notes": "Flow and session review required."
+      "notes": "Session-timeout review required."
     },
     {
       "rule_id": "not-checked-2-2-2",
@@ -249,7 +323,7 @@
         "2.2.2"
       ],
       "status": "open",
-      "notes": "Flow and motion review required."
+      "notes": "Auto-updating content review required."
     },
     {
       "rule_id": "not-checked-2-3-1",
@@ -258,7 +332,133 @@
         "2.3.1"
       ],
       "status": "open",
-      "notes": "Visual review required."
+      "notes": "Flashing/seizure review requires a visual frame-rate pass the scanner cannot perform."
+    },
+    {
+      "rule_id": "not-checked-2-4-5",
+      "title": "Multiple Ways",
+      "wcag": [
+        "2.4.5"
+      ],
+      "status": "open",
+      "notes": "Multi-path navigation (search, sitemap, nav) review is not automated and the checklist doesn't exercise it."
+    },
+    {
+      "rule_id": "not-checked-2-5-1",
+      "title": "Pointer Gestures",
+      "wcag": [
+        "2.5.1"
+      ],
+      "status": "open",
+      "notes": "Multi-point / path-based gestures (pinch, rotate, swipe paths) are not exercised by the checklist; 2.5.7 dragging is covered separately."
+    },
+    {
+      "rule_id": "not-checked-2-5-2",
+      "title": "Pointer Cancellation",
+      "wcag": [
+        "2.5.2"
+      ],
+      "status": "open",
+      "notes": "Down-event / up-event behavior is not audited automatically."
+    },
+    {
+      "rule_id": "not-checked-2-5-4",
+      "title": "Motion Actuation",
+      "wcag": [
+        "2.5.4"
+      ],
+      "status": "open",
+      "notes": "Device-motion / user-motion triggers are not audited automatically."
+    },
+    {
+      "rule_id": "not-checked-3-1-2",
+      "title": "Language of Parts",
+      "wcag": [
+        "3.1.2"
+      ],
+      "status": "open",
+      "notes": "Inline `lang` attributes on foreign-language passages are not audited automatically."
+    },
+    {
+      "rule_id": "not-checked-3-2-1",
+      "title": "On Focus",
+      "wcag": [
+        "3.2.1"
+      ],
+      "status": "open",
+      "notes": "Context-change-on-focus review is not automated."
+    },
+    {
+      "rule_id": "not-checked-3-2-2",
+      "title": "On Input",
+      "wcag": [
+        "3.2.2"
+      ],
+      "status": "open",
+      "notes": "Context-change-on-input review is not automated."
+    },
+    {
+      "rule_id": "not-checked-3-2-3",
+      "title": "Consistent Navigation",
+      "wcag": [
+        "3.2.3"
+      ],
+      "status": "open",
+      "notes": "Cross-page consistency review is not in scope for a single audit run."
+    },
+    {
+      "rule_id": "not-checked-3-2-4",
+      "title": "Consistent Identification",
+      "wcag": [
+        "3.2.4"
+      ],
+      "status": "open",
+      "notes": "Cross-page consistent labeling review is not in scope for a single audit run."
+    },
+    {
+      "rule_id": "not-checked-3-2-6",
+      "title": "Consistent Help",
+      "wcag": [
+        "3.2.6"
+      ],
+      "status": "open",
+      "notes": "Cross-page consistent-help-location review is not in scope for a single audit run."
+    },
+    {
+      "rule_id": "not-checked-3-3-3",
+      "title": "Error Suggestion",
+      "wcag": [
+        "3.3.3"
+      ],
+      "status": "open",
+      "notes": "Correction-suggestion review is not in scope; the checklist only confirms errors are announced."
+    },
+    {
+      "rule_id": "not-checked-3-3-4",
+      "title": "Error Prevention (Legal, Financial, Data)",
+      "wcag": [
+        "3.3.4"
+      ],
+      "status": "open",
+      "notes": "Destructive-action confirmation review is not automated."
+    },
+    {
+      "rule_id": "not-checked-3-3-7",
+      "title": "Redundant Entry",
+      "wcag": [
+        "3.3.7"
+      ],
+      "status": "open",
+      "notes": "Multi-step flow review required."
+    },
+    {
+      "rule_id": "not-checked-3-3-8",
+      "title": "Accessible Authentication (Minimum)",
+      "wcag": [
+        "3.3.8"
+      ],
+      "status": "open",
+      "notes": "Auth flow review required."
     }
   ]
 }

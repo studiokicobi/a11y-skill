@@ -1,3 +1,3 @@
-Found 2 active findings: 1 safe to fix now, 1 need your decision. Also generated 6 guided checks for this target.
+Found 2 active findings: 1 safe to fix now, 1 need your decision. Also generated 7 guided checks for this target.
 Full report: artifacts/audit-full-static-token-audit-output/report.md
 Recommended first step: say "apply the safe fixes". Open the report for all available next actions.

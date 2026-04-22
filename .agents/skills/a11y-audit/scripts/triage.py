@@ -19,11 +19,13 @@ import os
 import re
 import sys
 from collections import defaultdict
-from datetime import date, datetime, timezone
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, Iterable, List, Optional, Tuple
+from urllib.parse import unquote, urlparse
 
 from baseline import FINGERPRINT_VERSION, build_baseline, compare_findings, load_baseline
+from report import build_markdown_report, build_outcome_summary
 
 
 SCANNER_VERSION = "2.5.0"
@@ -60,13 +62,11 @@ RULE_TO_GROUP = {
     "clickable-div": "auto",
     "redundant-role": "auto",
     "target-blank-no-noopener": "auto",
-    "html-missing-lang": "auto",
     "input-placeholder-as-label": "auto",
     "tailwind-low-contrast": "auto",
     "css-low-contrast": "auto",
     "outline-none": "auto",
     "aria-hidden-focusable": "auto",
-    "duplicate-id": "auto",
 
     # Needs input
     "img-missing-alt": "input",
@@ -74,9 +74,18 @@ RULE_TO_GROUP = {
     "positive-tabindex": "input",
     "media-autoplay": "input",
     "heading-order": "input",
+    "icon-only-control": "input",
     "token-low-contrast": "input",
     "token-focus-indicator": "input",
     "token-color-only-semantic": "input",
+    # Renaming an id can break CSS selectors, JS lookups (getElementById,
+    # querySelector), ARIA references (aria-labelledby/aria-describedby,
+    # for/htmlFor), and anchor hashes — escalate to a decision.
+    "duplicate-id": "input",
+    # Hard-coding "en" is wrong for any non-English site (and for BCP-47 locales
+    # like "en-GB" vs "en-US" that affect screen-reader pronunciation). The
+    # agent can't reliably infer the right value, so escalate to a decision.
+    "html-missing-lang": "input",
 }
 
 
@@ -95,6 +104,7 @@ RULE_TO_SEVERITY = {
     "media-autoplay": "moderate",
     "positive-tabindex": "moderate",
     "duplicate-id": "moderate",
+    "icon-only-control": "serious",
     "color-contrast": "serious",
     "heading-order": "moderate",
     "token-low-contrast": "serious",
@@ -118,6 +128,7 @@ RULE_TO_CONFIDENCE = {
     "media-autoplay": "medium",
     "positive-tabindex": "high",
     "duplicate-id": "medium",
+    "icon-only-control": "high",
     "color-contrast": "high",
     "heading-order": "medium",
     "token-low-contrast": "high",
@@ -186,6 +197,102 @@ def _read_source_text(path_str: str) -> str:
         except OSError:
             SOURCE_TEXT_CACHE[path_str] = ""
     return SOURCE_TEXT_CACHE[path_str]
+
+
+def _find_repo_root(start: Path) -> Optional[Path]:
+    """Walk up from `start` looking for a `.git` marker; return None if absent."""
+    try:
+        current = start.resolve()
+    except (OSError, RuntimeError):
+        return None
+    if current.is_file():
+        current = current.parent
+    for candidate in [current, *current.parents]:
+        if (candidate / ".git").exists():
+            return candidate
+    return None
+
+
+def _repo_relative_path(value: str) -> str:
+    """Normalize a file path for stable, portable fingerprints.
+
+    Absolute paths are rewritten relative to the nearest git repo root so the
+    fingerprint is identical regardless of which subdirectory the scanner was
+    invoked from. Relative paths are normalized (``.`` / ``..`` segments
+    collapsed); a relative path that still escapes its origin with ``..`` is
+    resolved against the scanner's cwd so the repo-root rebase can still
+    apply. When no repo root can be found we deliberately return the absolute
+    path instead of falling back to ``Path.cwd()`` — a cwd-relative fallback
+    would make fingerprints depend on which subdirectory the scanner ran
+    from, which is exactly what this helper exists to prevent.
+
+    ``file://`` URIs are decoded and normalized like any other local path so
+    the fingerprint is stable whether axe-core reports a file as
+    ``file:///Users/.../index.html`` or as ``.agents/.../index.html``. Real
+    web schemes (``http``/``https``) and opaque non-file URIs pass through
+    unchanged.
+    """
+    if not value:
+        return value
+    if "://" in value:
+        parsed = urlparse(value)
+        if parsed.scheme.lower() != "file":
+            # Real web URL or other opaque URI — not a local filesystem path.
+            return value
+        # Decode percent-encoding. We drop the host component entirely: local
+        # `file://` URIs typically have an empty host, and a remote host has
+        # no meaning for local fingerprints.
+        decoded = unquote(parsed.path)
+        if not decoded:
+            return value
+        # Windows-style `file:///C:/foo` decodes to `/C:/foo`; strip the
+        # leading slash so the drive letter is preserved correctly.
+        if (
+            len(decoded) >= 3
+            and decoded[0] == "/"
+            and decoded[2] == ":"
+            and decoded[1].isalpha()
+        ):
+            decoded = decoded[1:]
+        value = decoded
+    normalized = value.replace("\\", "/")
+    while normalized.startswith("./"):
+        normalized = normalized[2:]
+    try:
+        candidate = Path(normalized)
+    except (TypeError, ValueError):
+        return normalized
+
+    def _posix(path: Path) -> str:
+        return str(path).replace("\\", "/")
+
+    if not candidate.is_absolute():
+        escapes = normalized.startswith("../") or normalized == ".." or "/../" in normalized
+        if not escapes:
+            # Plain relative path — collapse redundant segments but keep it
+            # relative so fingerprints don't depend on Path.cwd().
+            collapsed = os.path.normpath(normalized).replace("\\", "/")
+            return collapsed if collapsed != "." else normalized
+        # Relative path with `..` segments: resolve against cwd so we can
+        # still try to rebase against a repo root. Any failure drops back to
+        # a best-effort normpath so fingerprints don't leak cwd by accident.
+        try:
+            candidate = (Path.cwd() / candidate).resolve()
+        except (OSError, RuntimeError):
+            return os.path.normpath(normalized).replace("\\", "/")
+
+    repo_root = _find_repo_root(candidate)
+    if repo_root:
+        try:
+            return _posix(candidate.resolve().relative_to(repo_root))
+        except (ValueError, OSError):
+            pass
+    # No repo marker → keep the absolute path. Re-running from a different
+    # subdirectory must not silently change the fingerprint.
+    try:
+        return _posix(candidate.resolve())
+    except (OSError, RuntimeError):
+        return _posix(candidate)
 
 
 def _find_attr(snippet: str, pattern: re.Pattern) -> str:
@@ -275,7 +382,7 @@ def _static_fingerprint_data(issue: dict) -> dict:
 
 def _runtime_fingerprint_data(issue: dict, scanner: str) -> dict:
     selector = _normalize_selector_value(issue.get("fix_data", {}).get("target", "") or _signature(issue.get("snippet", "")))
-    page_context = str(issue.get("file", ""))
+    page_context = _repo_relative_path(str(issue.get("file", "")))
     step_id = issue.get("journey_step_id", "") or issue.get("fix_data", {}).get("journey_step_id", "")
     page_or_step_context = page_context if scanner == "runtime" else f"{page_context}|{step_id}"
     unstable = not bool(selector)
@@ -348,27 +455,39 @@ def render_fix(issue: dict) -> Optional[str]:
 
     if rule_id == "target-blank-no-noopener":
         before = snippet
-        if "rel=" in snippet:
-            match = re.search(r'rel\s*=\s*([\'"])([^\'"]*)([\'"])', snippet, re.IGNORECASE)
-            if not match:
-                return None
-            quote = match.group(1)
-            tokens = match.group(2).split()
+        rel_match = re.search(
+            r"\brel\s*=\s*([\"'])([^\"']*)\1",
+            snippet,
+            re.IGNORECASE,
+        )
+        if rel_match:
+            quote = rel_match.group(1)
+            tokens = rel_match.group(2).split()
             for token in ("noopener", "noreferrer"):
                 if token not in tokens:
                     tokens.append(token)
             merged = " ".join(tokens)
-            after = snippet[:match.start()] + f'rel={quote}{merged}{quote}' + snippet[match.end():]
+            after = (
+                snippet[: rel_match.start()]
+                + f"rel={quote}{merged}{quote}"
+                + snippet[rel_match.end():]
+            )
             return diff(before, after)
-        after = snippet.replace(
-            'target="_blank"',
-            'target="_blank" rel="noopener noreferrer"',
-            1,
+        # No existing rel= — inject one immediately after target="_blank",
+        # tolerating whitespace around `=` and either quote style.
+        target_match = re.search(
+            r"\btarget\s*=\s*([\"'])\s*_blank\s*\1",
+            snippet,
+            re.IGNORECASE,
         )
-        after = after.replace(
-            "target='_blank'",
-            "target='_blank' rel='noopener noreferrer'",
-            1,
+        if not target_match:
+            return None
+        quote = target_match.group(1)
+        insert_at = target_match.end()
+        after = (
+            snippet[:insert_at]
+            + f" rel={quote}noopener noreferrer{quote}"
+            + snippet[insert_at:]
         )
         return diff(before, after)
 
@@ -381,19 +500,46 @@ def render_fix(issue: dict) -> Optional[str]:
         )
 
     if rule_id == "input-placeholder-as-label":
-        placeholder = fix_data.get("placeholder", "")
-        input_id = _suggest_input_id(issue, fix_data)
         before = snippet
-        after = (
-            f'<label htmlFor="{input_id}">{placeholder}</label>\n'
-            + snippet.replace(
-                f'placeholder="{placeholder}"',
-                f'id="{input_id}" placeholder="{placeholder}"',
-                1,
-            )
+        # Accept either quote style (and a bare unquoted value) on both the
+        # placeholder attribute and any existing id, so the fix is not a
+        # no-op when the source file uses single quotes.
+        placeholder_re = re.compile(
+            r"placeholder\s*=\s*(?:\"([^\"]*)\"|'([^']*)'|([^\s>\"']+))",
+            re.IGNORECASE,
         )
-        if framework in {"vue", "angular", "html", "svelte"}:
-            after = after.replace("htmlFor", "for")
+        id_re = re.compile(
+            r"\bid\s*=\s*(?:\"([^\"]*)\"|'([^']*)'|([^\s>\"']+))",
+            re.IGNORECASE,
+        )
+        tag_re = re.compile(r"<([a-zA-Z][a-zA-Z0-9-]*)")
+
+        placeholder_match = placeholder_re.search(snippet)
+        tag_match = tag_re.match(snippet)
+        if not placeholder_match or not tag_match:
+            return None
+
+        placeholder_text = (
+            placeholder_match.group(1)
+            or placeholder_match.group(2)
+            or placeholder_match.group(3)
+            or fix_data.get("placeholder", "")
+        )
+
+        id_match = id_re.search(snippet)
+        if id_match:
+            input_id = id_match.group(1) or id_match.group(2) or id_match.group(3)
+            after_input = snippet
+        else:
+            input_id = _suggest_input_id(issue, fix_data)
+            insert_at = tag_match.end()
+            after_input = snippet[:insert_at] + f' id="{input_id}"' + snippet[insert_at:]
+
+        attr_name = "for" if framework in {"vue", "angular", "html", "svelte"} else "htmlFor"
+        after = (
+            f'<label {attr_name}="{input_id}">{placeholder_text}</label>\n'
+            + after_input
+        )
         return diff(before, after)
 
     if rule_id == "tailwind-low-contrast":
@@ -420,9 +566,63 @@ def render_fix(issue: dict) -> Optional[str]:
 
     if rule_id == "aria-hidden-focusable":
         before = snippet
-        after = snippet.replace('aria-hidden="true"', "").replace("aria-hidden='true'", "")
-        after = " ".join(after.split())
+        # Match any quote style or unquoted value, tolerate whitespace
+        # around `=`, and greedily capture whitespace on BOTH sides of the
+        # attribute. The replacement callback collapses the edit site
+        # locally — never touching other whitespace in the snippet — so
+        # repeated spaces inside `aria-label="Save   now"` or body text
+        # survive the fix unchanged. (Codex round-2 #3.)
+        pattern = re.compile(
+            r"(\s*)\baria-hidden\s*=\s*(?:\"[^\"]*\"|'[^']*'|[^\s>\"']+)(\s*)",
+            flags=re.IGNORECASE,
+        )
+
+        def _collapse_edit_site(match: re.Match) -> str:
+            leading, trailing = match.group(1), match.group(2)
+            # Whitespace on both sides → keep one space so neighboring
+            # attributes don't fuse. Whitespace on only one side → drop
+            # it; we're adjacent to a tag boundary or another attribute.
+            return " " if (leading and trailing) else ""
+
+        after, replaced = pattern.subn(_collapse_edit_site, snippet, count=1)
+        if not replaced:
+            return None
         return diff(before, after)
+
+    if rule_id == "duplicate-id":
+        id_value = fix_data.get("id", "")
+        first_line = fix_data.get("first_line", 0)
+        if not id_value:
+            return None
+        renamed = f"{id_value}-2"
+        before = snippet
+        after = snippet.replace(f'id="{id_value}"', f'id="{renamed}"', 1)
+        if after == before:
+            after = snippet.replace(f"id='{id_value}'", f"id='{renamed}'", 1)
+        suffix = (
+            f"\n<!-- note: first occurrence is at line {first_line}. "
+            f"Before renaming, search the codebase for `{id_value}` references "
+            "(htmlFor, aria-labelledby, anchor #hashes, document.getElementById, "
+            "CSS selectors) and update them or rename the other occurrence instead. -->"
+        )
+        return diff(before, after) + suffix
+
+    if rule_id == "icon-only-control":
+        element = fix_data.get("element", "button")
+        before = snippet
+        insertion = ' aria-label="TODO: describe the action"'
+        after = re.sub(
+            rf"<{re.escape(element)}\b",
+            f"<{element}{insertion}",
+            snippet,
+            count=1,
+            flags=re.IGNORECASE,
+        )
+        return (
+            diff(before, after)
+            + "\n<!-- note: replace the TODO with a short verb phrase matching what activating this control does "
+            "(e.g. \"Close dialog\", \"Search\", \"Next slide\"). -->"
+        )
 
     return None
 
@@ -443,6 +643,7 @@ def humanize_rule(rule_id: str) -> str:
         "media-autoplay": "Autoplay on media element",
         "positive-tabindex": "Positive tabindex disrupts tab order",
         "duplicate-id": "Duplicate id attribute",
+        "icon-only-control": "Icon-only control missing accessible name",
         "color-contrast": "Color contrast failure (runtime)",
         "heading-order": "Heading order skip",
         "token-low-contrast": "Token contrast pair fails WCAG",
@@ -458,11 +659,22 @@ def decision_prompt(issue: dict) -> str:
         "input-missing-label": "What should this input be labeled?",
         "positive-tabindex": "Is this tab order deliberate? If not, we'll remove the positive tabindex.",
         "media-autoplay": "Keep autoplay with pause controls, or remove autoplay entirely?",
+        "icon-only-control": 'What does this control do? We\'ll add an `aria-label` so screen readers announce its purpose.',
         "color-contrast": "Pick an accessible color that aligns with your brand — we'll suggest 2–3 options if you want.",
         "heading-order": "Should the out-of-order heading be downgraded/upgraded to match the sequence, or should we restructure the page hierarchy?",
         "token-low-contrast": "Which nearby compliant token value should replace this failing pair?",
         "token-focus-indicator": "Should we strengthen the focus ring color, width, or both for this token set?",
         "token-color-only-semantic": "What non-color cue should accompany this semantic token across the design system?",
+        "duplicate-id": (
+            "Which element keeps the id, and what should the other one be renamed to? "
+            "(Search the codebase first — CSS selectors, JS lookups, "
+            "aria-labelledby/aria-describedby, label[for], and anchor #hashes may depend on it.)"
+        ),
+        "html-missing-lang": (
+            "What BCP-47 language tag should go on `<html lang>`? "
+            "(e.g. `en`, `en-GB`, `sv`, `fr-CA`. Screen readers use this to pick pronunciation, "
+            "so it must match the document's primary language — don't just default to `en`.)"
+        ),
     }
     return prompts.get(issue["rule_id"], "Review and confirm the proposed fix below.")
 
@@ -579,6 +791,151 @@ def _relative_artifact_path(path_str: str, output_dir: Path) -> str:
     return os.path.relpath(candidate.resolve(), output_dir.resolve())
 
 
+_REQUIRED_ISSUE_FIELDS = ("rule_id", "file")
+_SCANNER_INPUT_HELP = {
+    "static": "Expected the output of scripts/a11y_scan.py (a JSON object with an `issues` array).",
+    "runtime": "Expected the output of scripts/a11y_runtime.js (a JSON object with an `issues` array).",
+    "stateful": "Expected the output of scripts/a11y_stateful.js (a JSON object with an `issues` array).",
+    "token": "Expected the output of scripts/tokens.py (a JSON object with an `issues` array).",
+}
+# For each non-static scanner, at least one of these per-issue signals must be
+# present so we can tell this issue actually came from that scanner. Static is
+# the only shape with no distinguishing signal, so it's excluded — an issue
+# that matches none of these patterns is treated as static.
+_REQUIRED_ISSUE_SIGNALS = {
+    "runtime": "explicit `scanner: \"runtime\"`, `framework: \"runtime\"`, `origin_rule_id`, or `fix_data.axe_rule`",
+    "stateful": "explicit `scanner: \"stateful\"`, `framework: \"stateful\"`, or `journey_step_id` (top-level or in `fix_data`)",
+    "token": "explicit `scanner: \"token\"` or `framework: \"token\"`",
+}
+
+
+def _exit_config_error(message: str) -> None:
+    """Exit with code 2 (configuration/runtime error) and a clean message."""
+    print(f"Configuration error: {message}", file=sys.stderr)
+    sys.exit(2)
+
+
+# Top-level `scanner` labels emitted by each scanner's output. Static
+# omits the top-level field entirely (legacy behaviour), but when present
+# it must match the declared scanner — otherwise we're almost certainly
+# reading the wrong file.
+_SCANNER_TOPLEVEL_LABELS = {
+    "static": {None, "static"},
+    "runtime": {"runtime"},
+    "stateful": {"stateful"},
+    "token": {"token"},
+}
+
+
+def _issue_signals_scanner(issue: dict) -> Optional[str]:
+    """Return the scanner this issue clearly belongs to, if signals are present.
+
+    Returns None when the issue is ambiguous (e.g. a static-shaped issue that
+    could come from any source). Used to catch mislabeled payloads — if an
+    issue obviously belongs to scanner Y but the caller declared X, we
+    reject instead of letting `_infer_scanner` silently reclassify it.
+    """
+    explicit = issue.get("scanner")
+    if explicit in SCANNER_VALUES:
+        return explicit
+    if issue.get("journey_step_id") or issue.get("fix_data", {}).get("journey_step_id"):
+        return "stateful"
+    framework = issue.get("framework")
+    if framework in {"stateful", "runtime", "token"}:
+        return framework
+    if issue.get("origin_rule_id") or issue.get("fix_data", {}).get("axe_rule"):
+        return "runtime"
+    return None
+
+
+def _validate_scanner_payload(path_str: Optional[str], scanner: str) -> Optional[dict]:
+    """Load and shape-validate a scanner JSON payload.
+
+    Raises ValueError with a human-readable message on: missing file,
+    invalid JSON, wrong top-level shape, `issues` not a list, any issue
+    missing required fields, or mislabeled payload (top-level `scanner`
+    or a per-issue signal that disagrees with the declared scanner).
+
+    Callers that want process-exit semantics should use
+    `_load_scanner_payload`, which wraps this with `_exit_config_error`.
+    """
+    if not path_str:
+        return None
+    path = Path(path_str)
+    help_text = _SCANNER_INPUT_HELP.get(scanner, "")
+    try:
+        raw = path.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        raise ValueError(f"--{scanner} file not found: {path}")
+    except OSError as exc:
+        raise ValueError(f"--{scanner} file unreadable: {path} ({exc})")
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise ValueError(
+            f"--{scanner} file is not valid JSON: {path} (line {exc.lineno}, column {exc.colno}: {exc.msg}). {help_text}"
+        )
+    if not isinstance(data, dict):
+        raise ValueError(
+            f"--{scanner} file must be a JSON object, got {type(data).__name__}: {path}. {help_text}"
+        )
+    top_level_scanner = data.get("scanner")
+    allowed_top_level = _SCANNER_TOPLEVEL_LABELS.get(scanner, {None, scanner})
+    if top_level_scanner not in allowed_top_level:
+        raise ValueError(
+            f"--{scanner} file declares top-level `scanner` of {top_level_scanner!r}, "
+            f"expected {sorted(str(v) for v in allowed_top_level)}: {path}. {help_text}"
+        )
+    issues = data.get("issues")
+    if issues is None:
+        # Empty payloads (no issues field) are treated as zero issues rather
+        # than an error — some scanners omit the key when they found nothing.
+        data["issues"] = []
+        return data
+    if not isinstance(issues, list):
+        raise ValueError(
+            f"--{scanner} file has `issues` of type {type(issues).__name__}, expected list: {path}. {help_text}"
+        )
+    for index, issue in enumerate(issues):
+        if not isinstance(issue, dict):
+            raise ValueError(
+                f"--{scanner} issue #{index} is {type(issue).__name__}, expected object: {path}."
+            )
+        missing = [field for field in _REQUIRED_ISSUE_FIELDS if field not in issue]
+        if missing:
+            raise ValueError(
+                f"--{scanner} issue #{index} missing required field(s) {missing}: {path}."
+            )
+        signalled = _issue_signals_scanner(issue)
+        if signalled is not None and signalled != scanner:
+            raise ValueError(
+                f"--{scanner} issue #{index} looks like {signalled!r} output "
+                f"(scanner/framework/journey_step_id signals): {path}. {help_text}"
+            )
+        # Non-static scanners must positively signal themselves on every
+        # issue. Without this the normalizer routes ambiguous rows through
+        # `_infer_scanner`, where they fall through to "static" — so a
+        # malformed runtime.json would triage as static-shaped findings
+        # while the report still claims runtime coverage (the regression
+        # Codex round-2 #1 found).
+        if scanner != "static" and signalled is None:
+            expected = _REQUIRED_ISSUE_SIGNALS.get(scanner, "")
+            raise ValueError(
+                f"--{scanner} issue #{index} has no {scanner}-specific signals; "
+                f"expected {expected}: {path}. {help_text}"
+            )
+    return data
+
+
+def _load_scanner_payload(path_str: Optional[str], scanner: str) -> Optional[dict]:
+    """CLI-entry wrapper: validate, or exit with code 2 on any failure."""
+    try:
+        return _validate_scanner_payload(path_str, scanner)
+    except ValueError as exc:
+        _exit_config_error(str(exc))
+        return None  # unreachable: sys.exit above
+
+
 def _infer_scanner(issue: dict) -> str:
     scanner = issue.get("scanner", "")
     if scanner in SCANNER_VALUES:
@@ -664,7 +1021,7 @@ def _fingerprint(issue: dict, scanner: str) -> Tuple[str, dict]:
     if scanner in {"static", "token"}:
         fingerprint = "|".join([
             issue["rule_id"],
-            str(issue.get("file", "")),
+            _repo_relative_path(str(issue.get("file", ""))),
             data["anchor_source"],
             data["anchor_value"],
         ])
@@ -1346,7 +1703,70 @@ def _collect_manual_context(report: dict, stateful_data: Optional[dict]) -> dict
     }
 
 
-def generate_manual_review_items(report: dict, stateful_data: Optional[dict]) -> List[dict]:
+def _token_only_manual_items() -> List[dict]:
+    """Checklist for token-only audits (no page-flow checks).
+
+    Returned when the user scanned only design tokens — there is no rendered
+    page to tab through, so page-flow checks like keyboard tab order, focus
+    return, heading outline, and zoom/reflow don't apply. What still applies:
+    design-system-level checks the token scan can't catch on its own.
+    """
+    return [
+        {
+            "title": "Use-of-color-only communication across semantic tokens",
+            "capability": "visual",
+            "wcag": ["1.4.1"],
+            "context": "Inspect tokens that convey meaning (success, error, warning, info, selected, disabled).",
+            "steps": [
+                "Preview each semantic token pair in a color-blindness simulator or grayscale.",
+                "Check that the paired icon, label, or shape token is mandatory (not optional) in the component spec.",
+            ],
+            "expected": [
+                "Meaning survives without hue perception.",
+                "The design system documents the non-color companion cue for every semantic state.",
+            ],
+        },
+        {
+            "title": "Theme coverage for every semantic token",
+            "capability": "design system",
+            "wcag": ["1.4.3", "1.4.11"],
+            "context": "If the product supports multiple themes (light/dark, high-contrast, branded), each semantic token needs a value in every theme.",
+            "steps": [
+                "Open the token source and confirm each semantic token has a value in every supported theme.",
+                "Spot-check contrast pairs in each theme with the contrast checker.",
+            ],
+            "expected": [
+                "No token resolves to `undefined` or inherits an inappropriate parent value in any theme.",
+                "Each theme passes the contrast rules the default theme passes.",
+            ],
+        },
+        {
+            "title": "Rendered composition at component boundaries",
+            "capability": "visual",
+            "wcag": ["1.4.3", "1.4.11"],
+            "context": "The token scan checks declared token pairs. It cannot see how components compose them (e.g., disabled text on a disabled background, tooltip on a translucent overlay).",
+            "steps": [
+                "List the component states that combine multiple tokens (disabled, hover, focus, selected, overlay).",
+                "Render each combination and measure the effective contrast against the background it actually lands on.",
+            ],
+            "expected": [
+                "Every rendered combination meets the relevant contrast ratio.",
+                "Tokens that only pass in isolation are flagged in the design system as 'do not combine with X'.",
+            ],
+        },
+    ]
+
+
+def generate_manual_review_items(
+    report: dict,
+    stateful_data: Optional[dict],
+    scanners_ran: Optional[List[str]] = None,
+) -> List[dict]:
+    # Token-only runs have no rendered page to exercise — swap in a
+    # design-system-scoped checklist instead of asking users to tab through
+    # a page that doesn't exist in this audit.
+    if scanners_ran and set(scanners_ran) == {"token"}:
+        return _token_only_manual_items()
     context = _collect_manual_context(report, stateful_data)
     items = [
         {
@@ -1394,7 +1814,7 @@ def generate_manual_review_items(report: dict, stateful_data: Optional[dict]) ->
         {
             "title": "Zoom, reflow, and text spacing resilience",
             "capability": "browser",
-            "wcag": ["1.4.10", "1.4.12"],
+            "wcag": ["1.4.4", "1.4.10", "1.4.12"],
             "context": "Run this on the main page and any key post-interaction view.",
             "steps": [
                 "Check the page at 200% zoom and then at 320px CSS width.",
@@ -1408,8 +1828,8 @@ def generate_manual_review_items(report: dict, stateful_data: Optional[dict]) ->
         {
             "title": "Reduced motion and motion-triggered interactions",
             "capability": "visual",
-            "wcag": ["2.3.*"],
-            "context": "Repeat the audited journey with reduced motion enabled if the UI animates.",
+            "wcag": ["2.3.3"],
+            "context": "Repeat the audited journey with reduced motion enabled if the UI animates. (2.3.1 Three-flashes is not covered here — it needs a visual frame-rate pass.)",
             "steps": [
                 "Turn on the OS or browser reduced-motion preference and replay the audited flow.",
                 "Trigger any animated transitions, expanding sections, or route changes observed during the scan.",
@@ -1417,6 +1837,20 @@ def generate_manual_review_items(report: dict, stateful_data: Optional[dict]) ->
             "expected": [
                 "Non-essential motion is reduced or removed.",
                 "Animations do not block task completion or hide focus movement.",
+            ],
+        },
+        {
+            "title": "Dragging gestures have a non-drag alternative",
+            "capability": "pointer",
+            "wcag": ["2.5.7"],
+            "context": "Inspect any control that relies on a click-hold-drag gesture (reorder handles, sliders, sortable lists, draggable cards, pan/zoom surfaces).",
+            "steps": [
+                "Identify every drag-based interaction in the audited page or flow.",
+                "Verify each one has a single-pointer alternative (keyboard arrow keys, up/down buttons, context menu, typed input) unless the dragging is essential.",
+            ],
+            "expected": [
+                "No feature requires dragging to complete unless dragging is essential to the task.",
+                "Single-pointer alternatives are discoverable, labeled, and reachable by keyboard.",
             ],
         },
         {
@@ -1504,396 +1938,6 @@ def generate_manual_review_items(report: dict, stateful_data: Optional[dict]) ->
     return items
 
 
-def _render_guided_checklist(items: List[dict], step_failures: List[dict]) -> List[str]:
-    lines = []
-    if step_failures:
-        lines.append("Recorded journey step failures:")
-        for failure in step_failures:
-            lines.append(
-                f"- `{failure.get('journey_step_id', '')}` ({failure.get('action', '')}) — {failure.get('message', '')}"
-            )
-        lines.append("")
-
-    for index, item in enumerate(items, start=1):
-        lines.append(f"#### {index}. {item['title']}")
-        lines.append(f"**Capability**: `{item['capability']}`")
-        lines.append(f"**WCAG**: {', '.join(item['wcag'])}")
-        lines.append(f"**Context**: {item['context']}")
-        lines.append("**How to test**:")
-        for step in item["steps"]:
-            lines.append(f"- [ ] {step}")
-        lines.append("**Expected result**:")
-        for expected in item["expected"]:
-            lines.append(f"- [ ] {expected}")
-        lines.append("")
-    return lines
-
-
-def _display_location(finding: dict) -> str:
-    location = finding["location"]
-    if location["file"]:
-        return f"`{location['file']}:{location['line']}`" if location["line"] else f"`{location['file']}`"
-    if location["journey_step_id"]:
-        return f"`{location['url']}` after step `{location['journey_step_id']}`"
-    return f"`{location['url']}`"
-
-
-def _render_not_checked_lines(findings: List[dict]) -> List[str]:
-    lines = []
-    for finding in findings:
-        criterion = finding["wcag"][0] if finding["wcag"] else ""
-        note = finding["proposed_fix"]["notes"]
-        if note:
-            lines.append(f"- {criterion} — {finding['title']} — {note}")
-        else:
-            lines.append(f"- {criterion} — {finding['title']}")
-    return lines
-
-
-def _finding_message(finding: dict, message_lookup: Dict[str, str]) -> str:
-    return message_lookup.get(finding["fingerprint"], "") or finding["title"]
-
-
-def _comparison_value(finding: dict) -> str:
-    return str(finding.get("comparison", "") or "")
-
-
-def _blast_radius_value(finding: dict) -> str:
-    blast_radius = finding.get("blast_radius")
-    if isinstance(blast_radius, dict):
-        return str(blast_radius.get("summary", "") or "")
-    return ""
-
-def _snapshot_lines(report: dict, render_context: Optional[dict]) -> List[str]:
-    render_context = render_context or {}
-    scanners_ran = list(render_context.get("scanners_ran", []))
-    artifact_paths = list(render_context.get("artifact_paths", []))
-    excluded_low_confidence_count = int(render_context.get("excluded_low_confidence_count", 0) or 0)
-
-    lines = [
-        "## Snapshot",
-        f"- Target: {report['target']}",
-        f"- Framework: {report['framework']}",
-        f"- Standard: {report['standard']}",
-    ]
-    mode = str(render_context.get("mode", "") or "").strip()
-    if mode:
-        lines.append(f"- Mode: {mode}")
-    if scanners_ran:
-        lines.append(f"- Checked: {', '.join(scanners_ran)}")
-
-    by_scanner = report["summary"].get("by_scanner", {})
-    scanner_parts = [
-        f"{scanner} {count}"
-        for scanner, count in by_scanner.items()
-        if count
-    ]
-    if scanner_parts:
-        lines.append(f"- Findings by source: {', '.join(scanner_parts)}")
-
-    baseline_comparison = report.get("baseline_comparison", {})
-    if baseline_comparison.get("baseline_present"):
-        baseline_parts = [
-            f"{name} {count}"
-            for name, count in baseline_comparison.get("summary", {}).items()
-            if count
-        ]
-        lines.append(f"- Baseline: {', '.join(baseline_parts) if baseline_parts else 'present'}")
-    else:
-        lines.append("- Baseline: none")
-
-    by_confidence = report["summary"].get("by_confidence", {})
-    confidence_parts = [
-        f"{confidence} {count}"
-        for confidence, count in by_confidence.items()
-        if count
-    ]
-    if confidence_parts:
-        lines.append(f"- Confidence: {', '.join(confidence_parts)}")
-
-    if excluded_low_confidence_count:
-        label = "finding" if excluded_low_confidence_count == 1 else "findings"
-        lines.append(
-            f"- Excluded from changed-files scope: {excluded_low_confidence_count} {label} with low-confidence mapping"
-        )
-
-    if artifact_paths:
-        lines.append("Artifacts:")
-        for artifact in artifact_paths:
-            lines.append(f"- `{artifact}`")
-
-    lines.append("")
-    return lines
-
-
-def _format_outcome_count(value: int, markdown: bool) -> str:
-    return f"**{value}**" if markdown else str(value)
-
-
-def _baseline_chat_verb(baseline_present: bool) -> str:
-    return "update the baseline" if baseline_present else "save the baseline"
-
-
-def build_outcome_summary(report: dict, manual_items: List[dict], markdown: bool = False) -> dict:
-    summary = report.get("summary", {})
-    auto_count = int(summary.get("auto_fixable_count", 0) or 0)
-    input_count = int(summary.get("needs_input_count", 0) or 0)
-    manual_review_count = int(summary.get("manual_review_count", 0) or 0)
-    guided_check_count = len(manual_items)
-    active_finding_count = int(summary.get("scanner_detected_issue_count", 0) or 0)
-    baseline_present = bool(report.get("baseline_comparison", {}).get("baseline_present"))
-    count = lambda value: _format_outcome_count(value, markdown)
-
-    if active_finding_count > 0:
-        body = (
-            f"Found {count(active_finding_count)} active findings: "
-            f"{count(auto_count)} safe to fix now, "
-            f"{count(input_count)} need your decision"
-        )
-        if manual_review_count > 0:
-            body += f", {count(manual_review_count)} to review manually"
-        body += "."
-        if guided_check_count > 0:
-            body += f" Also generated {count(guided_check_count)} guided checks for this target."
-    elif guided_check_count == 0 and not baseline_present:
-        body = 'No active findings. Say "save the baseline" to lock this clean run in as the regression reference.'
-    elif guided_check_count == 0 and baseline_present:
-        body = 'No active findings. Say "update the baseline" to refresh the regression reference with this clean run.'
-    elif not baseline_present:
-        body = (
-            f'No active findings. Generated {count(guided_check_count)} guided checks for this target '
-            '— say "give me the checklist" to walk through them, or "save the baseline" to lock this clean run in.'
-        )
-    else:
-        body = (
-            f'No active findings. Generated {count(guided_check_count)} guided checks for this target '
-            '— say "give me the checklist" to walk through them, or "update the baseline" to refresh it.'
-        )
-
-    return {
-        "active_finding_count": active_finding_count,
-        "auto_count": auto_count,
-        "input_count": input_count,
-        "manual_review_count": manual_review_count,
-        "guided_check_count": guided_check_count,
-        "baseline_present": baseline_present,
-        "baseline_verb": _baseline_chat_verb(baseline_present),
-        "outcome_body": body,
-    }
-
-
-def _test_it_yourself_variant(manual_review_count: int, guided_check_count: int) -> Optional[str]:
-    if manual_review_count > 0 and guided_check_count > 0:
-        return (
-            f'say "give me the checklist" — covers {manual_review_count} scanner-flagged findings to verify '
-            f'and {guided_check_count} guided checks. Or say "show me the manual findings" for just the '
-            "scanner-flagged items."
-        )
-    if manual_review_count > 0:
-        return (
-            f'say "show me the manual findings" — {manual_review_count} item'
-            f'{"s" if manual_review_count != 1 else ""} the scanner flagged but a human must verify.'
-        )
-    if guided_check_count > 0:
-        return f'say "give me the checklist" — {guided_check_count} guided checks for this target.'
-    return None
-
-
-def _next_step_lines(outcome_summary: dict) -> List[str]:
-    lines = ["## What to do next"]
-    active_finding_count = int(outcome_summary["active_finding_count"])
-    auto_count = int(outcome_summary["auto_count"])
-    input_count = int(outcome_summary["input_count"])
-    manual_review_count = int(outcome_summary["manual_review_count"])
-    guided_check_count = int(outcome_summary["guided_check_count"])
-    baseline_present = bool(outcome_summary["baseline_present"])
-
-    if auto_count > 0:
-        lines.append(
-            f'- **Safe to fix now ({auto_count}):** say "apply the safe fixes" and the agent will patch them.'
-        )
-    if input_count > 0:
-        lines.append(
-            f'- **Needs your decision ({input_count}):** say "walk me through the decisions" to answer them one at a time.'
-        )
-
-    test_it_yourself = _test_it_yourself_variant(manual_review_count, guided_check_count)
-    if test_it_yourself:
-        lines.append(f"- **Test it yourself:** {test_it_yourself}")
-
-    if active_finding_count == 0:
-        lines.append(
-            f'- **Baseline:** say "{_baseline_chat_verb(baseline_present)}" so this clean run becomes the regression reference.'
-        )
-    elif baseline_present:
-        lines.append(
-            '- **Baseline:** say "save the baseline" to make this run the new reference, '
-            'or "update the baseline" to refresh the existing one.'
-        )
-    else:
-        lines.append('- **Baseline:** say "save the baseline" to make this run the new reference.')
-
-    lines.append("")
-    return lines
-
-
-def build_markdown_report(
-    report: dict,
-    message_lookup: Dict[str, str],
-    manual_items: List[dict],
-    step_failures: List[dict],
-    render_context: Optional[dict] = None,
-) -> str:
-    findings = report["findings"]
-    active_findings = [f for f in findings if f["status"] == "open" and f["triage_group"] != "not_checked"]
-    groups = defaultdict(list)
-    for finding in active_findings:
-        groups[finding["triage_group"]].append(finding)
-
-    waived_findings = [f for f in findings if f["status"] == "waived"]
-    historical_findings = [f for f in findings if f["status"] in {"fixed", "resolved", "stale"}]
-    not_checked_findings = [f for f in findings if f["triage_group"] == "not_checked"]
-
-    auto_issues = groups["autofix"]
-    input_issues = groups["needs_input"]
-    manual_issues = groups["manual_review"]
-    outcome_summary = build_outcome_summary(report, manual_items, markdown=True)
-
-    generated_at = _parse_iso(report["generated_at"])
-    report_date = generated_at.date().isoformat() if generated_at else date.today().isoformat()
-
-    lines = []
-    lines.append("# Accessibility Audit Report\n")
-    lines.append(f"**Date**: {report_date}")
-    lines.append("")
-    lines.append(outcome_summary["outcome_body"])
-    lines.append("")
-    lines.extend(_snapshot_lines(report, render_context))
-    lines.extend(_next_step_lines(outcome_summary))
-    status_counts = report["summary"].get("status_counts", {})
-    if status_counts.get("waived") or status_counts.get("fixed") or status_counts.get("resolved") or status_counts.get("stale"):
-        status_parts = [
-            f"{status} {count}"
-            for status, count in status_counts.items()
-            if status != "open" and count
-        ]
-        lines.append(f"Tracked statuses: {', '.join(status_parts)}.")
-    baseline_comparison = report.get("baseline_comparison", {})
-    if baseline_comparison.get("baseline_present"):
-        baseline_parts = [
-            f"{name} {count}"
-            for name, count in baseline_comparison.get("summary", {}).items()
-            if count
-        ]
-        if baseline_parts:
-            lines.append(f"Regression summary: {', '.join(baseline_parts)}.")
-    lines.append("")
-    lines.append("---\n")
-
-    if auto_issues:
-        lines.append(f"## Safe to fix now ({len(auto_issues)})")
-        lines.append("")
-        lines.append('_The agent can apply these without further input. Say "apply the safe fixes" to proceed, or list which to skip._')
-        lines.append("")
-        for index, finding in enumerate(auto_issues, start=1):
-            lines.append(f"### {index}. [WCAG {finding['wcag'][0] if finding['wcag'] else 'best-practice'}] — {finding['title']}")
-            lines.append(f"**Location**: {_display_location(finding)}")
-            if _comparison_value(finding):
-                lines.append(f"**Baseline**: {_comparison_value(finding)}")
-            if _blast_radius_value(finding):
-                lines.append(f"**Blast radius**: {_blast_radius_value(finding)}")
-            lines.append(f"**Issue**: {_finding_message(finding, message_lookup)}")
-            lines.append("**Fix**:")
-            lines.append(finding["proposed_fix"]["diff"] or "*(No automatic fix template available)*")
-            lines.append("")
-        lines.append("---\n")
-
-    if input_issues:
-        lines.append(f"## Needs your decision ({len(input_issues)})")
-        lines.append("")
-        lines.append('_Each item asks one question. Say "walk me through the decisions" and the agent will go one at a time._')
-        lines.append("")
-        for index, finding in enumerate(input_issues, start=1):
-            lines.append(f"### {index}. [WCAG {finding['wcag'][0] if finding['wcag'] else 'best-practice'}] — {finding['title']}")
-            lines.append(f"**Location**: {_display_location(finding)}")
-            if _comparison_value(finding):
-                lines.append(f"**Baseline**: {_comparison_value(finding)}")
-            if _blast_radius_value(finding):
-                lines.append(f"**Blast radius**: {_blast_radius_value(finding)}")
-            lines.append(f"**Issue**: {_finding_message(finding, message_lookup)}")
-            lines.append(f"**Decision needed**: {finding['decision_required']['question']}")
-            current_code = finding["evidence"]["snippet"] or finding["evidence"]["dom_snippet"]
-            if current_code:
-                lines.append("**Current code**:")
-                lines.append(f"```\n{current_code}\n```")
-            lines.append("")
-        lines.append("---\n")
-
-    if manual_issues or manual_items:
-        lines.append("## Test it yourself")
-        lines.append("")
-        lines.append("_These require a human in the browser or with assistive tech — the things automated scanners can't reliably check._")
-        lines.append("")
-    if manual_issues:
-        lines.append(f"### Manual findings ({len(manual_issues)})")
-        lines.append("")
-        for index, finding in enumerate(manual_issues, start=1):
-            lines.append(f"#### {index}. [WCAG {finding['wcag'][0] if finding['wcag'] else 'best-practice'}] — {finding['title']}")
-            lines.append(f"**Location**: {_display_location(finding)}")
-            if _comparison_value(finding):
-                lines.append(f"**Baseline**: {_comparison_value(finding)}")
-            if _blast_radius_value(finding):
-                lines.append(f"**Blast radius**: {_blast_radius_value(finding)}")
-            lines.append(f"**Issue**: {_finding_message(finding, message_lookup)}")
-            lines.append("")
-    if manual_items:
-        lines.append(f"### Guided checklist ({len(manual_items)})")
-        lines.append("")
-        lines.extend(_render_guided_checklist(manual_items, step_failures))
-    if manual_issues or manual_items:
-        lines.append("---\n")
-
-    if waived_findings:
-        lines.append(f"## Waived (skipped on purpose) ({len(waived_findings)})")
-        lines.append("")
-        for index, finding in enumerate(waived_findings, start=1):
-            waiver = finding["waiver"] or {}
-            lines.append(f"### {index}. [WCAG {finding['wcag'][0] if finding['wcag'] else 'best-practice'}] — {finding['title']}")
-            lines.append(f"**Location**: {_display_location(finding)}")
-            if _comparison_value(finding):
-                lines.append(f"**Baseline**: {_comparison_value(finding)}")
-            if _blast_radius_value(finding):
-                lines.append(f"**Blast radius**: {_blast_radius_value(finding)}")
-            lines.append(f"**Reason**: {waiver.get('reason', '')}")
-            lines.append(f"**Approved by**: {waiver.get('approved_by', '')}")
-            lines.append(f"**Expires**: {waiver.get('expires_at', '')}")
-            lines.append("")
-        lines.append("---\n")
-
-    if historical_findings:
-        lines.append(f"## Resolved & tracked ({len(historical_findings)})")
-        lines.append("")
-        lines.append("These findings were carried from status records and are kept for tracking, not active remediation:")
-        lines.append("")
-        for index, finding in enumerate(historical_findings, start=1):
-            lines.append(f"### {index}. [WCAG {finding['wcag'][0] if finding['wcag'] else 'best-practice'}] — {finding['title']}")
-            lines.append(f"**Location**: {_display_location(finding)}")
-            lines.append(f"**Status**: {finding['status']}")
-            if _comparison_value(finding):
-                lines.append(f"**Baseline**: {_comparison_value(finding)}")
-            if _blast_radius_value(finding):
-                lines.append(f"**Blast radius**: {_blast_radius_value(finding)}")
-            lines.append(f"**Reason**: {finding['group_reason']}")
-            lines.append("")
-        lines.append("---\n")
-
-    lines.append("## Not checked by this audit")
-    lines.append("")
-    lines.append("These WCAG criteria are outside what the scanners can evaluate. "
-                 "The audit above is incomplete without addressing these separately:")
-    lines.extend(_render_not_checked_lines(not_checked_findings))
-
-    return "\n".join(lines)
 
 
 def _build_message_lookup(issues: List[dict]) -> Dict[str, str]:
@@ -1920,10 +1964,10 @@ def main():
     if not (args.static or args.runtime or args.stateful or args.tokens):
         parser.error("Provide --static, --runtime, --stateful, --tokens, or any combination.")
 
-    static_data = json.loads(Path(args.static).read_text()) if args.static else None
-    runtime_data = json.loads(Path(args.runtime).read_text()) if args.runtime else None
-    stateful_data = json.loads(Path(args.stateful).read_text()) if args.stateful else None
-    token_data = json.loads(Path(args.tokens).read_text()) if args.tokens else None
+    static_data = _load_scanner_payload(args.static, "static")
+    runtime_data = _load_scanner_payload(args.runtime, "runtime")
+    stateful_data = _load_scanner_payload(args.stateful, "stateful")
+    token_data = _load_scanner_payload(args.tokens, "token")
     try:
         baseline_data = load_baseline(args.baseline_file)
     except (ValueError, json.JSONDecodeError) as exc:
@@ -1946,7 +1990,19 @@ def main():
         raw_issues.extend(token_data.get("issues", []))
     message_lookup = _build_message_lookup(deduplicate(raw_issues))
 
-    manual_items = generate_manual_review_items(report, stateful_data)
+    scanners_ran_for_checklist = [
+        scanner
+        for scanner, payload in (
+            ("static", static_data),
+            ("runtime", runtime_data),
+            ("stateful", stateful_data),
+            ("token", token_data),
+        )
+        if payload
+    ]
+    manual_items = generate_manual_review_items(
+        report, stateful_data, scanners_ran=scanners_ran_for_checklist
+    )
     step_failures = list((stateful_data or {}).get("step_failures", []))
     artifact_paths = []
     if args.json_output:

@@ -2,10 +2,10 @@
 
 **Date**: <DATE>
 
-Found **1** active findings: **0** safe to fix now, **1** need your decision. Also generated **6** guided checks for this target.
+Found **1** active findings: **0** safe to fix now, **1** need your decision. Also generated **3** guided checks for this target.
 
 ## Snapshot
-- Target: /Users/colin/Sites/a11y-skill/.agents/skills/a11y-audit/fixtures/token-contrast/tokens.json
+- Target: fixtures/token-contrast/tokens.json
 - Framework: token
 - Standard: WCAG 2.2 Level AA
 - Mode: triage
@@ -18,7 +18,7 @@ Artifacts:
 
 ## What to do next
 - **Needs your decision (1):** say "walk me through the decisions" to answer them one at a time.
-- **Test it yourself:** say "give me the checklist" — 6 guided checks for this target.
+- **Test it yourself:** say "give me the checklist" — 3 guided checks for this target.
 - **Baseline:** say "save the baseline" to make this run the new reference.
 
 
@@ -29,7 +29,7 @@ Artifacts:
 _Each item asks one question. Say "walk me through the decisions" and the agent will go one at a time._
 
 ### 1. [WCAG 1.4.3] — Token contrast pair fails WCAG
-**Location**: `/Users/colin/Sites/a11y-skill/.agents/skills/a11y-audit/fixtures/token-contrast/tokens.json:18`
+**Location**: `fixtures/token-contrast/tokens.json:18`
 **Blast radius**: design-system wide
 **Issue**: Token pair body-muted resolves to #9aa0aa on #ffffff at 2.63:1, below the required 4.5:1 for text contrast. Blast radius: design-system wide. Nearby compliant foreground: #717781.
 **Decision needed**: Which nearby compliant token value should replace this failing pair?
@@ -44,73 +44,40 @@ _Each item asks one question. Say "walk me through the decisions" and the agent 
 
 _These require a human in the browser or with assistive tech — the things automated scanners can't reliably check._
 
-### Guided checklist (6)
+### Guided checklist (3)
 
-#### 1. Keyboard tab order through the audited page or flow
-**Capability**: `keyboard`
-**WCAG**: 2.1.1, 2.4.3
-**Context**: Use the current page-load state and every audited interaction state.
-**How to test**:
-- [ ] Press Tab from the browser chrome into the page and keep tabbing until focus returns to the browser or the end of the flow.
-- [ ] Repeat with Shift+Tab to verify the reverse order.
-**Expected result**:
-- [ ] Every interactive element is reachable in a logical visual order.
-- [ ] No keyboard trap appears and focus never jumps to hidden or inert UI.
-
-#### 2. Focus visibility and focus return behavior
-**Capability**: `visual`
-**WCAG**: 2.4.7, 2.4.11
-**Context**: Check each interactive state reached during the audit.
-**How to test**:
-- [ ] Tab to each control, including links, buttons, fields, and custom widgets.
-- [ ] Trigger any overlays, menus, or popovers that appear in the audited flow and then close them.
-**Expected result**:
-- [ ] The active element has a visible focus indicator with sufficient contrast.
-- [ ] When transient UI closes, focus returns to a sensible trigger or next logical control.
-
-#### 3. Heading outline and page title announcement
-**Capability**: `screen reader`
-**WCAG**: 1.3.1, 2.4.2, 2.4.6
-**Context**: Inspect the current page and any post-interaction destination states.
-**How to test**:
-- [ ] Open the page or flow with a screen reader rotor/list-of-headings view.
-- [ ] Move by heading level and confirm the document title after each destination change.
-**Expected result**:
-- [ ] The title uniquely identifies the current page or state.
-- [ ] Heading levels form a logical outline without skipped or decorative headings being announced as structure.
-
-#### 4. Zoom, reflow, and text spacing resilience
-**Capability**: `browser`
-**WCAG**: 1.4.10, 1.4.12
-**Context**: Run this on the main page and any key post-interaction view.
-**How to test**:
-- [ ] Check the page at 200% zoom and then at 320px CSS width.
-- [ ] Override text spacing to line-height 1.5, paragraph spacing 2x, letter spacing 0.12em, and word spacing 0.16em.
-**Expected result**:
-- [ ] Content remains usable without horizontal scrolling for main reading content.
-- [ ] No clipping, overlap, or lost controls appear when text spacing is increased.
-
-#### 5. Reduced motion and motion-triggered interactions
-**Capability**: `visual`
-**WCAG**: 2.3.*
-**Context**: Repeat the audited journey with reduced motion enabled if the UI animates.
-**How to test**:
-- [ ] Turn on the OS or browser reduced-motion preference and replay the audited flow.
-- [ ] Trigger any animated transitions, expanding sections, or route changes observed during the scan.
-**Expected result**:
-- [ ] Non-essential motion is reduced or removed.
-- [ ] Animations do not block task completion or hide focus movement.
-
-#### 6. Use-of-color-only communication
+#### 1. Use-of-color-only communication across semantic tokens
 **Capability**: `visual`
 **WCAG**: 1.4.1
-**Context**: Check interactive controls, validation states, charts, and inline status messages.
+**Context**: Inspect tokens that convey meaning (success, error, warning, info, selected, disabled).
 **How to test**:
-- [ ] Review the page in grayscale or with color filters disabled.
-- [ ] Inspect success, error, selected, and required states across the audited flow.
+- [ ] Preview each semantic token pair in a color-blindness simulator or grayscale.
+- [ ] Check that the paired icon, label, or shape token is mandatory (not optional) in the component spec.
 **Expected result**:
-- [ ] Meaning is still clear without color perception.
-- [ ] Status and selection are conveyed with text, iconography, or structural cues in addition to color.
+- [ ] Meaning survives without hue perception.
+- [ ] The design system documents the non-color companion cue for every semantic state.
+
+#### 2. Theme coverage for every semantic token
+**Capability**: `design system`
+**WCAG**: 1.4.3, 1.4.11
+**Context**: If the product supports multiple themes (light/dark, high-contrast, branded), each semantic token needs a value in every theme.
+**How to test**:
+- [ ] Open the token source and confirm each semantic token has a value in every supported theme.
+- [ ] Spot-check contrast pairs in each theme with the contrast checker.
+**Expected result**:
+- [ ] No token resolves to `undefined` or inherits an inappropriate parent value in any theme.
+- [ ] Each theme passes the contrast rules the default theme passes.
+
+#### 3. Rendered composition at component boundaries
+**Capability**: `visual`
+**WCAG**: 1.4.3, 1.4.11
+**Context**: The token scan checks declared token pairs. It cannot see how components compose them (e.g., disabled text on a disabled background, tooltip on a translucent overlay).
+**How to test**:
+- [ ] List the component states that combine multiple tokens (disabled, hover, focus, selected, overlay).
+- [ ] Render each combination and measure the effective contrast against the background it actually lands on.
+**Expected result**:
+- [ ] Every rendered combination meets the relevant contrast ratio.
+- [ ] Tokens that only pass in isolation are flagged in the design system as 'do not combine with X'.
 
 ---
 
@@ -122,7 +89,27 @@ These WCAG criteria are outside what the scanners can evaluate. The audit above 
 - 1.2.3 — Audio Description or Media Alternative (Prerecorded) — Media asset review required.
 - 1.2.4 — Captions (Live) — Live media review required.
 - 1.2.5 — Audio Description (Prerecorded) — Media asset review required.
-- 1.4.2 — Audio Control — Static autoplay checks are partial and do not verify controls.
-- 2.2.1 — Timing Adjustable — Flow and session review required.
-- 2.2.2 — Pause, Stop, Hide — Flow and motion review required.
-- 2.3.1 — Three Flashes or Below Threshold — Visual review required.
+- 1.3.2 — Meaningful Sequence — The checklist exercises tab order (2.4.3); programmatic reading-sequence review is not automated.
+- 1.3.3 — Sensory Characteristics — Non-color sensory cues (shape, size, orientation, sound) are not exercised by the checklist.
+- 1.3.4 — Orientation — Portrait/landscape lock review not automated; 1.4.10 reflow is separate.
+- 1.3.5 — Identify Input Purpose — No autocomplete rule is implemented; user must review `autocomplete` attributes on personal-data fields.
+- 1.4.13 — Content on Hover or Focus — Hoverable/focusable revealed content (tooltips, popovers) is not exercised by the checklist.
+- 1.4.5 — Images of Text — Image-of-text detection is not automated; the checklist doesn't exercise it.
+- 2.1.4 — Character Key Shortcuts — Single-character shortcuts are not audited automatically.
+- 2.2.1 — Timing Adjustable — Session-timeout review required.
+- 2.2.2 — Pause, Stop, Hide — Auto-updating content review required.
+- 2.3.1 — Three Flashes or Below Threshold — Flashing/seizure review requires a visual frame-rate pass the scanner cannot perform.
+- 2.4.5 — Multiple Ways — Multi-path navigation (search, sitemap, nav) review is not automated and the checklist doesn't exercise it.
+- 2.5.1 — Pointer Gestures — Multi-point / path-based gestures (pinch, rotate, swipe paths) are not exercised by the checklist; 2.5.7 dragging is covered separately.
+- 2.5.2 — Pointer Cancellation — Down-event / up-event behavior is not audited automatically.
+- 2.5.4 — Motion Actuation — Device-motion / user-motion triggers are not audited automatically.
+- 3.1.2 — Language of Parts — Inline `lang` attributes on foreign-language passages are not audited automatically.
+- 3.2.1 — On Focus — Context-change-on-focus review is not automated.
+- 3.2.2 — On Input — Context-change-on-input review is not automated.
+- 3.2.3 — Consistent Navigation — Cross-page consistency review is not in scope for a single audit run.
+- 3.2.4 — Consistent Identification — Cross-page consistent labeling review is not in scope for a single audit run.
+- 3.2.6 — Consistent Help — Cross-page consistent-help-location review is not in scope for a single audit run.
+- 3.3.3 — Error Suggestion — Correction-suggestion review is not in scope; the checklist only confirms errors are announced.
+- 3.3.4 — Error Prevention (Legal, Financial, Data) — Destructive-action confirmation review is not automated.
+- 3.3.7 — Redundant Entry — Multi-step flow review required.
+- 3.3.8 — Accessible Authentication (Minimum) — Auth flow review required.

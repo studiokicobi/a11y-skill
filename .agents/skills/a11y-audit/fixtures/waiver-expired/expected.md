@@ -2,7 +2,7 @@
 
 **Date**: <DATE>
 
-Found **1** active findings: **1** safe to fix now, **0** need your decision. Also generated **6** guided checks for this target.
+Found **1** active findings: **1** safe to fix now, **0** need your decision. Also generated **7** guided checks for this target.
 
 ## Snapshot
 - Target: fixtures/waiver-expired
@@ -18,7 +18,7 @@ Artifacts:
 
 ## What to do next
 - **Safe to fix now (1):** say "apply the safe fixes" and the agent will patch them.
-- **Test it yourself:** say "give me the checklist" — 6 guided checks for this target.
+- **Test it yourself:** say "give me the checklist" — 7 guided checks for this target.
 - **Baseline:** say "save the baseline" to make this run the new reference.
 
 
@@ -43,7 +43,7 @@ _The agent can apply these without further input. Say "apply the safe fixes" to 
 
 _These require a human in the browser or with assistive tech — the things automated scanners can't reliably check._
 
-### Guided checklist (6)
+### Guided checklist (7)
 
 #### 1. Keyboard tab order through the audited page or flow
 **Capability**: `keyboard`
@@ -80,7 +80,7 @@ _These require a human in the browser or with assistive tech — the things auto
 
 #### 4. Zoom, reflow, and text spacing resilience
 **Capability**: `browser`
-**WCAG**: 1.4.10, 1.4.12
+**WCAG**: 1.4.4, 1.4.10, 1.4.12
 **Context**: Run this on the main page and any key post-interaction view.
 **How to test**:
 - [ ] Check the page at 200% zoom and then at 320px CSS width.
@@ -91,8 +91,8 @@ _These require a human in the browser or with assistive tech — the things auto
 
 #### 5. Reduced motion and motion-triggered interactions
 **Capability**: `visual`
-**WCAG**: 2.3.*
-**Context**: Repeat the audited journey with reduced motion enabled if the UI animates.
+**WCAG**: 2.3.3
+**Context**: Repeat the audited journey with reduced motion enabled if the UI animates. (2.3.1 Three-flashes is not covered here — it needs a visual frame-rate pass.)
 **How to test**:
 - [ ] Turn on the OS or browser reduced-motion preference and replay the audited flow.
 - [ ] Trigger any animated transitions, expanding sections, or route changes observed during the scan.
@@ -100,7 +100,18 @@ _These require a human in the browser or with assistive tech — the things auto
 - [ ] Non-essential motion is reduced or removed.
 - [ ] Animations do not block task completion or hide focus movement.
 
-#### 6. Use-of-color-only communication
+#### 6. Dragging gestures have a non-drag alternative
+**Capability**: `pointer`
+**WCAG**: 2.5.7
+**Context**: Inspect any control that relies on a click-hold-drag gesture (reorder handles, sliders, sortable lists, draggable cards, pan/zoom surfaces).
+**How to test**:
+- [ ] Identify every drag-based interaction in the audited page or flow.
+- [ ] Verify each one has a single-pointer alternative (keyboard arrow keys, up/down buttons, context menu, typed input) unless the dragging is essential.
+**Expected result**:
+- [ ] No feature requires dragging to complete unless dragging is essential to the task.
+- [ ] Single-pointer alternatives are discoverable, labeled, and reachable by keyboard.
+
+#### 7. Use-of-color-only communication
 **Capability**: `visual`
 **WCAG**: 1.4.1
 **Context**: Check interactive controls, validation states, charts, and inline status messages.
@@ -121,7 +132,27 @@ These WCAG criteria are outside what the scanners can evaluate. The audit above 
 - 1.2.3 — Audio Description or Media Alternative (Prerecorded) — Media asset review required.
 - 1.2.4 — Captions (Live) — Live media review required.
 - 1.2.5 — Audio Description (Prerecorded) — Media asset review required.
-- 1.4.2 — Audio Control — Static autoplay checks are partial and do not verify controls.
-- 2.2.1 — Timing Adjustable — Flow and session review required.
-- 2.2.2 — Pause, Stop, Hide — Flow and motion review required.
-- 2.3.1 — Three Flashes or Below Threshold — Visual review required.
+- 1.3.2 — Meaningful Sequence — The checklist exercises tab order (2.4.3); programmatic reading-sequence review is not automated.
+- 1.3.3 — Sensory Characteristics — Non-color sensory cues (shape, size, orientation, sound) are not exercised by the checklist.
+- 1.3.4 — Orientation — Portrait/landscape lock review not automated; 1.4.10 reflow is separate.
+- 1.3.5 — Identify Input Purpose — No autocomplete rule is implemented; user must review `autocomplete` attributes on personal-data fields.
+- 1.4.13 — Content on Hover or Focus — Hoverable/focusable revealed content (tooltips, popovers) is not exercised by the checklist.
+- 1.4.5 — Images of Text — Image-of-text detection is not automated; the checklist doesn't exercise it.
+- 2.1.4 — Character Key Shortcuts — Single-character shortcuts are not audited automatically.
+- 2.2.1 — Timing Adjustable — Session-timeout review required.
+- 2.2.2 — Pause, Stop, Hide — Auto-updating content review required.
+- 2.3.1 — Three Flashes or Below Threshold — Flashing/seizure review requires a visual frame-rate pass the scanner cannot perform.
+- 2.4.5 — Multiple Ways — Multi-path navigation (search, sitemap, nav) review is not automated and the checklist doesn't exercise it.
+- 2.5.1 — Pointer Gestures — Multi-point / path-based gestures (pinch, rotate, swipe paths) are not exercised by the checklist; 2.5.7 dragging is covered separately.
+- 2.5.2 — Pointer Cancellation — Down-event / up-event behavior is not audited automatically.
+- 2.5.4 — Motion Actuation — Device-motion / user-motion triggers are not audited automatically.
+- 3.1.2 — Language of Parts — Inline `lang` attributes on foreign-language passages are not audited automatically.
+- 3.2.1 — On Focus — Context-change-on-focus review is not automated.
+- 3.2.2 — On Input — Context-change-on-input review is not automated.
+- 3.2.3 — Consistent Navigation — Cross-page consistency review is not in scope for a single audit run.
+- 3.2.4 — Consistent Identification — Cross-page consistent labeling review is not in scope for a single audit run.
+- 3.2.6 — Consistent Help — Cross-page consistent-help-location review is not in scope for a single audit run.
+- 3.3.3 — Error Suggestion — Correction-suggestion review is not in scope; the checklist only confirms errors are announced.
+- 3.3.4 — Error Prevention (Legal, Financial, Data) — Destructive-action confirmation review is not automated.
+- 3.3.7 — Redundant Entry — Multi-step flow review required.
+- 3.3.8 — Accessible Authentication (Minimum) — Auth flow review required.

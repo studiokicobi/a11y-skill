@@ -1,0 +1,1 @@
+Configuration error: --stateful issue #0 has no stateful-specific signals

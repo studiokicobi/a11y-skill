@@ -1,0 +1,22 @@
+{
+  "target": "fixtures/aria-hidden-preserves-whitespace",
+  "framework": "html",
+  "files_scanned": 1,
+  "issue_count": 1,
+  "issues": [
+    {
+      "rule_id": "aria-hidden-focusable",
+      "wcag": "4.1.2",
+      "file": "fixtures/aria-hidden-preserves-whitespace/button.html",
+      "line": 5,
+      "col": 1,
+      "snippet": "<button aria-label=\"Save   now\" aria-hidden=\"true\" data-id=\"x   y\">Save   now</button>",
+      "message": "aria-hidden=\"true\" on focusable <button>. Remove aria-hidden or add tabindex=\"-1\".",
+      "framework": "html",
+      "triage_hint": "auto",
+      "fix_data": {
+        "attribute_value": "true"
+      }
+    }
+  ]
+}

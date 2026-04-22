@@ -163,6 +163,16 @@ ON_CLICK_RE = re.compile(
     r"(?:\bon[Cc]lick\s*=|\bon:click\s*=|\(click\)\s*=)",
     re.IGNORECASE,
 )
+# Interactive ARIA roles that make a non-semantic element keyboard-focusable
+# when paired with a tabindex. A <div role="button" tabindex="0" onClick>
+# behaves like a real button and should not be flagged as a missed handler.
+INTERACTIVE_ROLE_RE = re.compile(
+    r'\brole\s*=\s*["\']'
+    r'(button|link|checkbox|radio|menuitem|menuitemcheckbox|menuitemradio|option|switch|tab)'
+    r'["\']',
+    re.IGNORECASE,
+)
+TABINDEX_ATTR_RE = re.compile(r'\btabindex\s*=\s*["\']?(-?\d+)["\']?', re.IGNORECASE)
 
 REDUNDANT_ROLE_TAG_RE = re.compile(
     r"<(nav|main|button|article|section)\b([^>]*?)>",
@@ -205,6 +215,32 @@ FOCUSABLE_ARIA_HIDDEN_RE = re.compile(
 ARIA_HIDDEN_TRUE_RE = re.compile(r'\baria-hidden\s*=\s*["\']true["\']',
                                  re.IGNORECASE)
 
+# Duplicate id detection uses the existing ID_ATTR_RE to collect every
+# id value and its offset within the file.
+ID_ATTR_WITH_POS_RE = re.compile(
+    r'\bid\s*=\s*["\']([^"\']+)["\']',
+    re.IGNORECASE,
+)
+
+ICON_CONTROL_RE = re.compile(
+    r"<(button|a)\b([^>]*?)>(.*?)</\1>",
+    re.IGNORECASE | re.DOTALL,
+)
+ICON_INDICATOR_RE = re.compile(
+    r"<(svg|i|use|path|img)\b",
+    re.IGNORECASE,
+)
+ARIA_LABELLEDBY_RE = re.compile(r'\baria-label(?:ledby)?\s*=\s*["\'][^"\']+["\']',
+                                re.IGNORECASE)
+TITLE_ATTR_VALUE_RE = re.compile(r'\btitle\s*=\s*["\']([^"\']+)["\']', re.IGNORECASE)
+ALT_ATTR_VALUE_RE = re.compile(r'\balt\s*=\s*["\']([^"\']+)["\']', re.IGNORECASE)
+SR_ONLY_CLASS_RE = re.compile(
+    r'\bclass\s*=\s*["\'][^"\']*\b(sr-only|visually-hidden|screen-reader-only|visuallyhidden)\b',
+    re.IGNORECASE,
+)
+HREF_ATTR_RE = re.compile(r'\bhref\s*=\s*["\']([^"\']*)["\']', re.IGNORECASE)
+TAG_STRIP_RE = re.compile(r"<[^>]+>")
+
 
 def rule_missing_alt(text, path, framework):
     for m in IMG_TAG_RE.finditer(text):
@@ -231,6 +267,12 @@ def rule_clickable_non_interactive(text, path, framework):
         element = m.group(1).lower()
         attrs = m.group(2)
         if not ON_CLICK_RE.search(attrs):
+            continue
+        # Skip: element already has an interactive ARIA role + a valid tabindex.
+        # That combo (e.g. `<div role="button" tabindex="0" onClick>`) is the
+        # documented pattern for custom-built interactive controls and is
+        # keyboard-accessible — flagging it would be a false positive.
+        if INTERACTIVE_ROLE_RE.search(attrs) and TABINDEX_ATTR_RE.search(attrs):
             continue
         line, col = pos_to_line_col(text, m.start())
         yield Issue(
@@ -433,6 +475,102 @@ def rule_positive_tabindex(text, path, framework):
         )
 
 
+def rule_duplicate_id(text, path, framework):
+    """Flag every duplicate `id="..."` occurrence after the first in a file.
+
+    HTML requires document-unique ids. Same-file duplicates are a static signal;
+    they're commonly fixable without runtime context, though references to the
+    renamed id (htmlFor, aria-labelledby, anchors, selectors) still need review.
+    """
+    first_seen = {}
+    for m in ID_ATTR_WITH_POS_RE.finditer(text):
+        id_value = m.group(1)
+        if id_value in first_seen:
+            line, col = pos_to_line_col(text, m.start())
+            yield Issue(
+                rule_id="duplicate-id",
+                wcag="4.1.1",
+                file=str(path),
+                line=line,
+                col=col,
+                snippet=snippet_around(text, m.start(), m.end()),
+                message=(
+                    f'Duplicate id="{id_value}" (first seen at line '
+                    f'{first_seen[id_value]}). HTML requires ids to be unique '
+                    "within a document."
+                ),
+                framework=framework,
+                triage_hint="auto",
+                fix_data={
+                    "id": id_value,
+                    "first_line": first_seen[id_value],
+                    "pattern": "rename_duplicate_id",
+                },
+            )
+        else:
+            first_seen[id_value] = pos_to_line_col(text, m.start())[0]
+
+
+def _control_has_accessible_name(attrs: str, inner_html: str) -> bool:
+    if ARIA_LABELLEDBY_RE.search(attrs):
+        return True
+    if TITLE_ATTR_VALUE_RE.search(attrs):
+        return True
+
+    for img_m in IMG_TAG_RE.finditer(inner_html):
+        alt_m = ALT_ATTR_VALUE_RE.search(img_m.group(0))
+        if alt_m and alt_m.group(1).strip():
+            return True
+
+    # Visually-hidden accessible text wrapper (common pattern).
+    if SR_ONLY_CLASS_RE.search(inner_html):
+        return True
+
+    stripped = TAG_STRIP_RE.sub("", inner_html)
+    # Collapse whitespace and entity artefacts that render as empty.
+    stripped = re.sub(r"\s+", " ", stripped).strip()
+    stripped = stripped.replace("\u00a0", "").strip()
+    return bool(stripped)
+
+
+def rule_icon_only_control(text, path, framework):
+    """Flag <button>/<a> elements that only contain icon markup and no accessible name.
+
+    Conservative: only fires when the control has an icon-like child (svg, i,
+    use, path, img) AND no text content, visually-hidden label, aria-label,
+    aria-labelledby, or title. `alt=""` on a child img counts as no name.
+    """
+    for m in ICON_CONTROL_RE.finditer(text):
+        element = m.group(1).lower()
+        attrs = m.group(2) or ""
+        inner = m.group(3) or ""
+
+        # Anchors without href are not focusable and are handled elsewhere; skip.
+        if element == "a" and not HREF_ATTR_RE.search(attrs):
+            continue
+        if not ICON_INDICATOR_RE.search(inner):
+            continue
+        if _control_has_accessible_name(attrs, inner):
+            continue
+
+        line, col = pos_to_line_col(text, m.start())
+        yield Issue(
+            rule_id="icon-only-control",
+            wcag="4.1.2",
+            file=str(path),
+            line=line,
+            col=col,
+            snippet=snippet_around(text, m.start(), m.end()),
+            message=(
+                f"Icon-only <{element}> has no accessible name. Screen readers "
+                "will announce nothing or the raw SVG contents."
+            ),
+            framework=framework,
+            triage_hint="input",
+            fix_data={"element": element, "pattern": "add_icon_label"},
+        )
+
+
 def rule_aria_hidden_focusable(text, path, framework):
     for m in FOCUSABLE_ARIA_HIDDEN_RE.finditer(text):
         element = m.group(1).lower()
@@ -546,6 +684,8 @@ TAG_RULES = [
     rule_media_autoplay,
     rule_positive_tabindex,
     rule_aria_hidden_focusable,
+    rule_duplicate_id,
+    rule_icon_only_control,
 ]
 
 LINE_RULES = [

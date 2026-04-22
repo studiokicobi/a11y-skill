@@ -30,7 +30,7 @@
       "file": "http://example.test/checkout",
       "line": 0,
       "col": 0,
-      "snippet": "<span data-component-stack=\"Checkout > PriceBadge@src/components/PriceBadge.tsx:18\">$9</span>",
+      "snippet": "<span class=\"price-badge\">$9</span>",
       "message": "Elements must meet minimum color contrast ratio thresholds.",
       "framework": "runtime",
       "triage_hint": "input",

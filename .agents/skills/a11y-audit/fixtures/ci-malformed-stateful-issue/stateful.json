@@ -1,0 +1,14 @@
+{
+  "scanner": "stateful",
+  "issues": [
+    {
+      "rule_id": "img-missing-alt",
+      "wcag": "1.1.1",
+      "file": "https://example.test/settings",
+      "line": 0,
+      "col": 0,
+      "snippet": "<img class=\"dialog-image\" src=\"summary.png\">",
+      "message": "Images must have alternate text."
+    }
+  ]
+}

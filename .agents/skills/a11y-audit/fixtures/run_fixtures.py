@@ -287,7 +287,7 @@ def run_static_fixture(fixture_dir: Path, update: bool = False) -> bool:
 
     result = subprocess.run(
         [sys.executable, str(SCANNER), str(fixture_dir), "--quiet", "--output", "/tmp/actual.json"],
-        capture_output=True, text=True,
+        capture_output=True, text=True, cwd=str(SKILL_ROOT),
     )
     if result.returncode != 0:
         print(f"  FAIL {name}: scanner exited {result.returncode}")
@@ -351,7 +351,7 @@ def run_runtime_smoke_fixture(fixture_dir: Path, update: bool = False) -> bool:
     if screenshot_dir:
         cmd.extend(["--screenshot-dir", str(screenshot_dir)])
 
-    result = subprocess.run(cmd, capture_output=True, text=True)
+    result = subprocess.run(cmd, capture_output=True, text=True, cwd=str(SKILL_ROOT))
     if result.returncode != 0:
         print(f"  FAIL {name}: runtime scan exited {result.returncode}")
         print(f"        stderr: {result.stderr.strip()}")
@@ -395,7 +395,7 @@ def run_stateful_smoke_fixture(fixture_dir: Path, update: bool = False) -> bool:
     if screenshot_dir:
         cmd.extend(["--screenshot-dir", str(screenshot_dir)])
 
-    result = subprocess.run(cmd, capture_output=True, text=True)
+    result = subprocess.run(cmd, capture_output=True, text=True, cwd=str(SKILL_ROOT))
     if result.returncode != 0:
         print(f"  FAIL {name}: stateful scan exited {result.returncode}")
         print(f"        stderr: {result.stderr.strip()}")
@@ -434,7 +434,7 @@ def run_runtime_error_fixture(fixture_dir: Path) -> bool:
         "--config",
         str(config_path),
     ]
-    result = subprocess.run(cmd, capture_output=True, text=True)
+    result = subprocess.run(cmd, capture_output=True, text=True, cwd=str(SKILL_ROOT))
     stderr = result.stderr.strip()
 
     if result.returncode == 0:
@@ -451,6 +451,112 @@ def run_runtime_error_fixture(fixture_dir: Path) -> bool:
 
     print(f"  FAIL {name}: runtime error differed from expected.error.txt")
     return False
+
+
+def run_cli_error_fixture(fixture_dir: Path, update: bool = False) -> bool:
+    """CLI invocations that MUST fail — validates exit code and stderr.
+
+    Fixture layout:
+        cli-error.fixture.json           { "args": ["ci", "--runtime", "./runtime.json"] }
+        expected.exit.txt                exit code (usually 2)
+        expected.stderr.starts_with.txt  prefix that stderr's first non-empty
+                                         line MUST start with (strong guard —
+                                         catches tracebacks / wrong wrappers)
+        expected.stderr.contains.txt     (optional) additional substring that
+                                         must appear anywhere in stderr
+        <any referenced files>           e.g. runtime.json with a malformed payload
+
+    The `starts_with` file is the strong regression guard Codex round-2 #6
+    asked for: a Python traceback that happens to contain the expected
+    phrase deeper in its output would fail because its first non-empty
+    line is "Traceback (most recent call last):", not the clean
+    `Configuration error:` wrapper. At least one of `starts_with` or
+    `contains` must be present.
+
+    We don't snapshot the whole first line because it can include a
+    fully-resolved absolute path (not portable across machines). A prefix
+    snapshot captures the clean-wrapper invariant without embedding
+    machine-specific content.
+
+    Args use `./<path>` to refer to a file in the fixture directory — resolved
+    to an absolute path at run time so the CLI sees a real file.
+    """
+    name = fixture_dir.name
+    spec_path = fixture_dir / "cli-error.fixture.json"
+    expected_exit_path = fixture_dir / "expected.exit.txt"
+    expected_starts_with_path = fixture_dir / "expected.stderr.starts_with.txt"
+    expected_contains_path = fixture_dir / "expected.stderr.contains.txt"
+
+    spec = json.loads(spec_path.read_text(encoding="utf-8"))
+    raw_args = spec.get("args", [])
+    resolved_args: list = []
+    for arg in raw_args:
+        if isinstance(arg, str) and arg.startswith("./"):
+            resolved_args.append(str((fixture_dir / arg[2:]).resolve()))
+        else:
+            resolved_args.append(arg)
+
+    output_dir = Path(f"/tmp/cli-error-fixture-{name}")
+    if output_dir.exists():
+        shutil.rmtree(output_dir)
+
+    cmd = [sys.executable, str(CLI), *resolved_args]
+    if "--output-dir" not in raw_args:
+        cmd.extend(["--output-dir", str(output_dir)])
+    if "--detected-at" not in raw_args:
+        cmd.extend(["--detected-at", FIXED_DETECTED_AT])
+
+    result = subprocess.run(cmd, capture_output=True, text=True, cwd=str(SKILL_ROOT))
+    actual_exit = result.returncode
+    actual_stderr = result.stderr
+    # Skip leading blank lines so a traceback's empty preamble can't hide the
+    # real first line.
+    stderr_lines = [line for line in actual_stderr.splitlines() if line.strip()]
+    actual_first_line = stderr_lines[0] if stderr_lines else ""
+
+    if update:
+        expected_exit_path.write_text(str(actual_exit) + "\n", encoding="utf-8")
+        # Default to the clean-wrapper prefix as the strong guard. Callers who
+        # want a longer or looser starts-with can edit the file after update.
+        if not expected_starts_with_path.exists():
+            expected_starts_with_path.write_text("Configuration error: \n", encoding="utf-8")
+        print(f"  UPDATED {name}: CLI error snapshot refreshed")
+        return True
+
+    ok = True
+    if expected_exit_path.exists():
+        expected_exit = int(expected_exit_path.read_text().strip())
+        if actual_exit == expected_exit:
+            print(f"  PASS {name}: CLI-error exit code matched snapshot")
+        else:
+            print(f"  FAIL {name}: CLI-error exit code expected {expected_exit}, got {actual_exit}")
+            print(f"        stderr: {actual_stderr.strip()[:200]}")
+            ok = False
+
+    if not expected_starts_with_path.exists() and not expected_contains_path.exists():
+        print(f"  FAIL {name}: no stderr expectation (expected.stderr.starts_with.txt or .contains.txt)")
+        ok = False
+
+    if expected_starts_with_path.exists():
+        expected_prefix = expected_starts_with_path.read_text().rstrip("\n")
+        if expected_prefix and actual_first_line.startswith(expected_prefix):
+            print(f"  PASS {name}: CLI-error stderr first line starts with expected prefix")
+        else:
+            print(f"  FAIL {name}: CLI-error stderr first line missing expected prefix")
+            print(f"        expected prefix: {expected_prefix!r}")
+            print(f"        actual first:    {actual_first_line!r}")
+            ok = False
+
+    if expected_contains_path.exists():
+        expected_contains = expected_contains_path.read_text().strip()
+        if expected_contains and expected_contains in actual_stderr:
+            print(f"  PASS {name}: CLI-error stderr contained expected substring")
+        else:
+            print(f"  FAIL {name}: CLI-error stderr missing {expected_contains!r}")
+            print(f"        actual: {actual_stderr.strip()[:200]}")
+            ok = False
+
+    return ok
 
 
 def run_triage_fixture(fixture_dir: Path, update: bool = False) -> bool:
@@ -492,7 +598,7 @@ def run_triage_fixture(fixture_dir: Path, update: bool = False) -> bool:
     if tokens_path.exists():
         token_result = subprocess.run(
             [sys.executable, str(TOKENS), str(tokens_path), "--output", str(tokens_output_path)],
-            capture_output=True, text=True,
+            capture_output=True, text=True, cwd=str(SKILL_ROOT),
         )
         if token_result.returncode != 0:
             print(f"  FAIL {name}: token scan exited {token_result.returncode}")
@@ -504,14 +610,14 @@ def run_triage_fixture(fixture_dir: Path, update: bool = False) -> bool:
     if status_path.exists():
         cmd.extend(["--status-file", str(status_path)])
 
-    result = subprocess.run(cmd, capture_output=True, text=True)
+    result = subprocess.run(cmd, capture_output=True, text=True, cwd=str(SKILL_ROOT))
     if result.returncode != 0:
         print(f"  FAIL {name}: triage exited {result.returncode}")
         print(f"        stderr: {result.stderr.strip()}")
         return False
 
     actual_markdown = normalize_report(output_markdown_path.read_text())
-    actual_json = normalize_report_json(json.loads(output_json_path.read_text()))
+    actual_json = normalize_report_json(json.loads(output_json_path.read_text()), fixture_name=name)
 
     if update:
         expected_markdown_path.write_text(actual_markdown)
@@ -556,21 +662,22 @@ def run_cli_fixture(fixture_dir: Path, update: bool = False) -> bool:
     status_path = fixture_dir / "status.json"
     changed_files_path = fixture_dir / "changed-files.txt"
     token_output_path = Path("/tmp/cli-tokens.json")
-    summary_output_path = Path("/tmp/pr-summary.md")
-    output_json_path = Path("/tmp/cli-report.json")
-    for path in (token_output_path, summary_output_path, output_json_path):
-        try:
-            path.unlink()
-        except FileNotFoundError:
-            pass
+    ci_output_dir = Path(f"/tmp/cli-fixture-{name}")
+    if ci_output_dir.exists():
+        shutil.rmtree(ci_output_dir)
+    try:
+        token_output_path.unlink()
+    except FileNotFoundError:
+        pass
+    summary_output_path = ci_output_dir / "summary.md"
+    output_json_path = ci_output_dir / "report.json"
 
     cmd = [
         sys.executable,
         str(CLI),
-        "--json-output",
-        str(output_json_path),
-        "--pr-summary-output",
-        str(summary_output_path),
+        "ci",
+        "--output-dir",
+        str(ci_output_dir),
         "--detected-at",
         FIXED_DETECTED_AT,
         "--ci",
@@ -584,7 +691,7 @@ def run_cli_fixture(fixture_dir: Path, update: bool = False) -> bool:
     if tokens_path.exists():
         token_result = subprocess.run(
             [sys.executable, str(TOKENS), str(tokens_path), "--output", str(token_output_path)],
-            capture_output=True, text=True,
+            capture_output=True, text=True, cwd=str(SKILL_ROOT),
         )
         if token_result.returncode != 0:
             print(f"  FAIL {name}: token scan exited {token_result.returncode}")
@@ -598,7 +705,7 @@ def run_cli_fixture(fixture_dir: Path, update: bool = False) -> bool:
     if changed_files_path.exists():
         cmd.extend(["--changed-files", str(changed_files_path)])
 
-    result = subprocess.run(cmd, capture_output=True, text=True)
+    result = subprocess.run(cmd, capture_output=True, text=True, cwd=str(SKILL_ROOT))
     actual_exit = result.returncode
     actual_summary = normalize_report(summary_output_path.read_text()) if summary_output_path.exists() else ""
     actual_json = json.loads(output_json_path.read_text()) if output_json_path.exists() else None
@@ -696,7 +803,7 @@ def run_audit_fixture(fixture_dir: Path, update: bool = False) -> bool:
     if status_file:
         cmd.extend(["--status-file", str((fixture_dir / status_file).resolve())])
 
-    result = subprocess.run(cmd, capture_output=True, text=True)
+    result = subprocess.run(cmd, capture_output=True, text=True, cwd=str(SKILL_ROOT))
     if result.returncode != 0:
         print(f"  FAIL {name}: audit command exited {result.returncode}")
         print(f"        stderr: {result.stderr.strip()}")
@@ -770,6 +877,8 @@ def run_fixture(fixture_dir: Path, update: bool = False) -> bool:
     """Returns True if the fixture passes (or was updated), False on failure."""
     if (fixture_dir / "audit.fixture.json").exists():
         return run_audit_fixture(fixture_dir, update=update)
+    if (fixture_dir / "cli-error.fixture.json").exists():
+        return run_cli_error_fixture(fixture_dir, update=update)
     if (fixture_dir / "cli.fixture").exists() or (fixture_dir / "expected.summary.md").exists() or (fixture_dir / "expected.exit.txt").exists():
         return run_cli_fixture(fixture_dir, update=update)
     if (fixture_dir / "expected.stateful.json").exists():
@@ -786,6 +895,59 @@ def run_fixture(fixture_dir: Path, update: bool = False) -> bool:
     ):
         return run_triage_fixture(fixture_dir, update=update)
     return run_static_fixture(fixture_dir, update=update)
+
+
+def run_invariant_checks() -> bool:
+    """Pure-Python invariants we want to guard against regressions even when
+    no fixture exercises them.
+
+    Committing machine-specific absolute paths as fixture inputs would break
+    portability, so these checks import triage helpers directly and compare
+    results at runtime.
+    """
+    ok = True
+    scripts_dir = str(SKILL_ROOT / "scripts")
+    if scripts_dir not in sys.path:
+        sys.path.insert(0, scripts_dir)
+    try:
+        from triage import _repo_relative_path
+    except ImportError as exc:
+        print(f"  FAIL invariant: could not import triage._repo_relative_path ({exc})")
+        return False
+
+    # A concrete file inside this repo — normalized via plain path vs. file://
+    # URI vs. percent-encoded file:// URI. All three forms must collapse to the
+    # same repo-relative fingerprint, so baselines don't drift when axe-core
+    # emits a file-URL form of a path that was previously reported plain.
+    concrete = SKILL_ROOT / "fixtures" / "html-basic" / "index.html"
+    plain = str(concrete.resolve())
+    file_url = "file://" + plain
+    # Insert a percent-encoded space into a synthetic path to exercise unquote
+    # even though no real repo file has a space — the helper should accept it.
+    encoded_url = "file://" + plain.replace("/", "/%2E%2F/").replace("/%2E%2F//", "/")  # no-op; keep plain
+    # Simpler: percent-encode a directory separator; unquote must reverse it.
+    encoded_url = "file://" + plain.replace("fixtures", "fixture%73")  # `s` → `%73`
+    plain_norm = _repo_relative_path(plain)
+    file_norm = _repo_relative_path(file_url)
+    encoded_norm = _repo_relative_path(encoded_url)
+    if plain_norm == file_norm == encoded_norm and not plain_norm.startswith("/"):
+        print(f"  PASS invariant: file:// and plain path normalize identically ({plain_norm})")
+    else:
+        print("  FAIL invariant: file:// normalization diverged from plain-path normalization")
+        print(f"        plain:   {plain_norm!r}")
+        print(f"        file://: {file_norm!r}")
+        print(f"        %-enc:   {encoded_norm!r}")
+        ok = False
+
+    # Real web URLs must pass through unchanged — `_repo_relative_path` is
+    # only supposed to touch local paths.
+    for web in ("http://localhost:3000/page", "https://example.test/x"):
+        if _repo_relative_path(web) != web:
+            print(f"  FAIL invariant: web URL mutated: {web!r} -> {_repo_relative_path(web)!r}")
+            ok = False
+    if ok:
+        print("  PASS invariant: http/https URLs pass through unchanged")
+    return ok
 
 
 def main():
@@ -810,6 +972,7 @@ def main():
             or (d / "expected.stdout.txt").exists()
             or (d / "expected.exit.txt").exists()
             or (d / "expected.error.txt").exists()
+            or (d / "cli-error.fixture.json").exists()
             or (args.live_runtime and ((d / "expected.runtime.json").exists() or (d / "expected.stateful.json").exists()))
         )
     )
@@ -825,6 +988,16 @@ def main():
 
     passed = 0
     failed = 0
+
+    # Runtime invariants (no snapshot) run before the fixture loop so a
+    # regression in path-normalization semantics fails loudly even when the
+    # downstream fixtures happen to all round-trip correctly.
+    if not args.only:
+        if run_invariant_checks():
+            passed += 1
+        else:
+            failed += 1
+
     for fixture_dir in fixtures:
         ok = run_fixture(fixture_dir, update=args.update)
         if ok:

@@ -127,7 +127,7 @@ Keep `triage.py`, `report.py`, and `baseline.py` for fixtures, debugging, and ad
 
 ## Conversation contract
 
-After `audit` completes, reuse the exact generated `outcome_body` string from that run. Do not recompute it, summarize it, or paraphrase it. Wrap it exactly like this:
+After `audit` completes, reuse the exact generated `outcome_body` string from that run. Do not recompute it, summarize it, or paraphrase it. The CLI prints it to stdout as the first line; it is also persisted in `manifest.json` at `outcome.body` so you can reload it from a prior run without rescanning. Wrap it exactly like this:
 
 `Audit complete. {outcome_body} Full report: \`{path}\`. What would you like to do?`
 
@@ -193,9 +193,9 @@ When runtime/stateful DOM snippets expose debug source hints such as `data-sourc
 
 **Stateful scanner (`a11y_stateful.js`):** runs Playwright journeys described in `references/journey_schema.md`, executes `click`, `press`, `fill`, `select`, `navigate`, and `assert` steps, and performs checkpoint axe scans after selected steps. Findings preserve `journey_step_id`, and the raw output records focus transitions, step failures, and checkpoint screenshots.
 
-**Guided checklist (neither scanner can automate):** keyboard navigation (full tab walkthrough), screen reader testing, visual reflow, motion sensitivity, cognitive accessibility, and the WCAG 2.2 criteria that require flow review (2.5.7 Dragging, 3.3.7 Redundant Entry, 3.3.8 Accessible Authentication). See `references/triage-rules.md` for the full checklist.
+**Guided checklist (neither scanner can automate):** keyboard navigation (full tab walkthrough), screen reader testing, visual reflow, motion sensitivity (2.3.3), dragging gestures (2.5.7), and use-of-color-only verification. Flow-specific WCAG 2.2 criteria (3.3.7 Redundant Entry, 3.3.8 Accessible Authentication) are **not** covered by the checklist — they require hand-rolled tests against your specific flow and are listed under "Not checked" so the gap stays visible. See `references/triage-rules.md` for the full checklist.
 
-**Not checked by either:** captions, audio descriptions, transcripts, timing-adjustable controls, seizure risk assessment, reading-level analysis, consistent-navigation review, error prevention on destructive actions. These WCAG criteria require media review or multi-page flow analysis, which is outside scope. The audit report lists these explicitly in the "Not checked" section so gaps are visible.
+**Not checked by either:** captions and audio descriptions (1.2.\*), timing-adjustable controls (2.2.\*), seizure risk (2.3.1), multi-point gestures / pointer cancellation / motion actuation (2.5.1, 2.5.2, 2.5.4), cross-page consistency (3.2.3, 3.2.4, 3.2.6), error suggestion and destructive-action prevention (3.3.3, 3.3.4), Redundant Entry (3.3.7), and Accessible Authentication (3.3.8). These criteria require media review, multi-page flow analysis, or a visual pass the scanner cannot perform. `references/wcag_coverage.md` is the full authoritative matrix; the audit report surfaces every `out-of-scope` row under **Not checked** so the gap stays visible.
 
 ## Color contrast
 

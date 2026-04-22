@@ -1,0 +1,14 @@
+{
+  "scanner": "runtime",
+  "issues": [
+    {
+      "rule_id": "img-missing-alt",
+      "wcag": "1.1.1",
+      "file": "http://example.test/home",
+      "line": 0,
+      "col": 0,
+      "snippet": "<img src=\"/logo.png\">",
+      "message": "Images must have alternate text."
+    }
+  ]
+}
