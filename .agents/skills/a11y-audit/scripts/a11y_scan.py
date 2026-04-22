@@ -61,7 +61,15 @@ class Issue:
 
 
 def detect_framework(root: Path) -> str:
+    # `package.fixture.json` is an alternate manifest name reserved for test
+    # fixtures in this repo. Real projects always use `package.json`; fixtures
+    # use the alternate so GitHub's dependency graph (Dependabot) does not
+    # scan pinned versions and raise CVEs for dependencies that are never
+    # installed or executed. Real-world scans still look at `package.json`
+    # first, so user behavior is unchanged.
     pkg = root / "package.json"
+    if not pkg.exists():
+        pkg = root / "package.fixture.json"
     if pkg.exists():
         try:
             data = json.loads(pkg.read_text(encoding="utf-8", errors="ignore"))
