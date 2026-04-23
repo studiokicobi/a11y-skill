@@ -137,30 +137,36 @@ RULE_TO_CONFIDENCE = {
 }
 
 
+TAILWIND_REPLACEMENTS = {
+    "text-gray-300": "text-gray-600",
+    "text-gray-400": "text-gray-600",
+    "text-slate-300": "text-slate-600",
+    "text-slate-400": "text-slate-600",
+    "text-zinc-300": "text-zinc-600",
+    "text-zinc-400": "text-zinc-600",
+    "text-neutral-300": "text-neutral-600",
+    "text-neutral-400": "text-neutral-600",
+    "text-stone-300": "text-stone-600",
+    "text-stone-400": "text-stone-600",
+    "text-red-300": "text-red-700",
+    "text-red-400": "text-red-700",
+    "text-blue-300": "text-blue-700",
+    "text-blue-400": "text-blue-700",
+    "text-green-300": "text-green-700",
+    "text-green-400": "text-green-700",
+    "text-yellow-300": "text-yellow-800",
+    "text-yellow-400": "text-yellow-800",
+    "text-orange-300": "text-orange-700",
+    "text-orange-400": "text-orange-700",
+}
+
+
+def _tailwind_has_replacement(cls: str) -> bool:
+    return cls in TAILWIND_REPLACEMENTS
+
+
 def _get_tailwind_replacement(cls: str) -> str:
-    mapping = {
-        "text-gray-300": "text-gray-600",
-        "text-gray-400": "text-gray-600",
-        "text-slate-300": "text-slate-600",
-        "text-slate-400": "text-slate-600",
-        "text-zinc-300": "text-zinc-600",
-        "text-zinc-400": "text-zinc-600",
-        "text-neutral-300": "text-neutral-600",
-        "text-neutral-400": "text-neutral-600",
-        "text-stone-300": "text-stone-600",
-        "text-stone-400": "text-stone-600",
-        "text-red-300": "text-red-700",
-        "text-red-400": "text-red-700",
-        "text-blue-300": "text-blue-700",
-        "text-blue-400": "text-blue-700",
-        "text-green-300": "text-green-700",
-        "text-green-400": "text-green-700",
-        "text-yellow-300": "text-yellow-800",
-        "text-yellow-400": "text-yellow-800",
-        "text-orange-300": "text-orange-700",
-        "text-orange-400": "text-orange-700",
-    }
-    return mapping.get(cls, cls + " (no automatic replacement — pick manually)")
+    return TAILWIND_REPLACEMENTS.get(cls, cls)
 
 
 def _get_color_replacement(color: str) -> str:
@@ -665,6 +671,11 @@ def decision_prompt(issue: dict) -> str:
         "token-low-contrast": "Which nearby compliant token value should replace this failing pair?",
         "token-focus-indicator": "Should we strengthen the focus ring color, width, or both for this token set?",
         "token-color-only-semantic": "What non-color cue should accompany this semantic token across the design system?",
+        "tailwind-low-contrast": (
+            "This Tailwind color class likely fails WCAG AA 4.5:1 and has no safe "
+            "mapping to a compliant shade. Pick a darker shade in the same family "
+            "or a different accessible color class."
+        ),
         "duplicate-id": (
             "Which element keeps the id, and what should the other one be renamed to? "
             "(Search the codebase first — CSS selectors, JS lookups, "
@@ -756,8 +767,13 @@ def deduplicate(issues: List[dict]) -> List[dict]:
 
 
 def classify(issue: dict) -> str:
-    if issue["rule_id"] in RULE_TO_GROUP:
-        return RULE_TO_GROUP[issue["rule_id"]]
+    rule_id = issue["rule_id"]
+    if rule_id == "tailwind-low-contrast":
+        cls = issue.get("fix_data", {}).get("class", "")
+        if not _tailwind_has_replacement(cls):
+            return "input"
+    if rule_id in RULE_TO_GROUP:
+        return RULE_TO_GROUP[rule_id]
     return issue.get("triage_hint", "input")
 
 

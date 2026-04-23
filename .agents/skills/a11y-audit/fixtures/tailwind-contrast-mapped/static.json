@@ -1,0 +1,23 @@
+{
+  "target": "/Users/colin/Sites/a11y-skill/.agents/skills/a11y-audit/fixtures/tailwind-contrast-mapped",
+  "framework": "react",
+  "files_scanned": 1,
+  "issue_count": 1,
+  "issues": [
+    {
+      "rule_id": "tailwind-low-contrast",
+      "wcag": "1.4.3",
+      "file": "/Users/colin/Sites/a11y-skill/.agents/skills/a11y-audit/fixtures/tailwind-contrast-mapped/Badge.tsx",
+      "line": 5,
+      "col": 22,
+      "snippet": "<span className=\"text-red-300\">",
+      "message": "Tailwind class `text-red-300` likely fails WCAG AA contrast on light backgrounds.",
+      "framework": "react",
+      "triage_hint": "auto",
+      "fix_data": {
+        "class": "text-red-300",
+        "pattern": "tailwind_swap"
+      }
+    }
+  ]
+}

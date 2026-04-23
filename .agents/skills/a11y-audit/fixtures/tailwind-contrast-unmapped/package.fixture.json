@@ -1,0 +1,6 @@
+{
+  "name": "tailwind-contrast-unmapped-fixture",
+  "dependencies": {
+    "react": "^18.0.0"
+  }
+}
