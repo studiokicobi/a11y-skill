@@ -64,7 +64,7 @@ def finding_in_scope(finding: dict, changed_files: Set[str]) -> bool:
     if not changed_files:
         return True
     if finding.get("triage_group") == "not_checked":
-        return False
+        return True
     return any(_path_matches(candidate, changed_files) for candidate in _finding_paths(finding))
 
 
