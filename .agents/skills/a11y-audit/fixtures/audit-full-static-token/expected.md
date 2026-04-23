@@ -2,7 +2,7 @@
 
 **Date**: <DATE>
 
-Found **2** active findings: **1** safe to fix now, **1** need your decision. Also generated **7** guided checks for this target.
+Found **2** active findings: **0** safe to fix now, **2** need your decision. Also generated **7** guided checks for this target.
 
 ## Snapshot
 - Target: fixtures/audit-full-static-token/source
@@ -21,30 +21,14 @@ Artifacts:
 - `scanners/tokens.json`
 
 ## What to do next
-- **Safe to fix now (1):** say "apply the safe fixes" and the agent will patch them.
-- **Needs your decision (1):** say "walk me through the decisions" to answer them one at a time.
+- **Needs your decision (2):** say "walk me through the decisions" to answer them one at a time.
 - **Test it yourself:** say "give me the checklist" — 7 guided checks for this target.
 - **Baseline:** say "save the baseline" to make this run the new reference.
 
 
 ---
 
-## Safe to fix now (1)
-
-_The agent can apply these without further input. Say "apply the safe fixes" to proceed, or list which to skip._
-
-### 1. [WCAG 2.1.1] — Non-interactive element with click handler
-**Location**: `fixtures/audit-full-static-token/source/index.html:4`
-**Issue**: <div> with onClick is not keyboard-accessible. Use <button type="button"> or <a href> instead.
-**Fix**:
-```diff
-- <div onClick="saveDraft()">
-+ <button type="button" onClick="saveDraft()">
-```
-
----
-
-## Needs your decision (1)
+## Needs your decision (2)
 
 _Each item asks one question. Say "walk me through the decisions" and the agent will go one at a time._
 
@@ -56,6 +40,15 @@ _Each item asks one question. Say "walk me through the decisions" and the agent 
 **Current code**:
 ```
 {"background": "color.surface.default", "foreground": "color.text.muted", "id": "body-muted", "kind": "text", "scope": "design-system"}
+```
+
+### 2. [WCAG 2.1.1] — Non-interactive element with click handler
+**Location**: `fixtures/audit-full-static-token/source/index.html:4`
+**Issue**: <div> with onClick is not keyboard-accessible. Use <button type="button"> or <a href> instead.
+**Decision needed**: Is this an action (replace with `<button type="button">`) or navigation (replace with `<a href="…">`)? The closing tag also needs to change — the scanner only captured the opening tag.
+**Current code**:
+```
+<div onClick="saveDraft()">
 ```
 
 ---

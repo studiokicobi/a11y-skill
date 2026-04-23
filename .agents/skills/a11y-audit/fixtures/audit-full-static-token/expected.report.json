@@ -6,8 +6,8 @@
   "standard": "WCAG 2.2 Level AA",
   "summary": {
     "scanner_detected_issue_count": 2,
-    "auto_fixable_count": 1,
-    "needs_input_count": 1,
+    "auto_fixable_count": 0,
+    "needs_input_count": 2,
     "manual_review_count": 0,
     "waived_count": 0,
     "not_checked_count": 29,
@@ -80,63 +80,6 @@
   },
   "findings": [
     {
-      "id": "66312d522b2b",
-      "rule_id": "clickable-div",
-      "title": "Non-interactive element with click handler",
-      "wcag": [
-        "2.1.1"
-      ],
-      "severity": "serious",
-      "scanner": "static",
-      "scanner_version": "2.5.0",
-      "detected_at": "2026-01-02T03:04:05Z",
-      "triage_group": "autofix",
-      "fix_safety": "safe",
-      "confidence": "high",
-      "status": "open",
-      "group_reason": "Rule is classified as safe to patch automatically for this evidence source.",
-      "location": {
-        "file": "fixtures/audit-full-static-token/source/index.html",
-        "line": 4,
-        "column": 5,
-        "url": "",
-        "selector": "",
-        "journey_step_id": ""
-      },
-      "mapping": {
-        "source_file": "fixtures/audit-full-static-token/source/index.html",
-        "source_line": 4,
-        "confidence": "high",
-        "explanation": "Mapped directly from the source scanner location."
-      },
-      "evidence": {
-        "snippet": "<div onClick=\"saveDraft()\">",
-        "dom_snippet": "",
-        "screenshot": "",
-        "axe_help_url": ""
-      },
-      "decision_required": {
-        "question": "",
-        "options": []
-      },
-      "proposed_fix": {
-        "kind": "diff",
-        "diff": "```diff\n- <div onClick=\"saveDraft()\">\n+ <button type=\"button\" onClick=\"saveDraft()\">\n```",
-        "notes": ""
-      },
-      "fingerprint": "clickable-div|.agents/skills/a11y-audit/fixtures/audit-full-static-token/source/index.html|line|line-4",
-      "confirmed_by": [
-        "static"
-      ],
-      "waiver": null,
-      "fingerprint_data": {
-        "fingerprint_version": "1.0",
-        "anchor_source": "line",
-        "anchor_value": "line-4",
-        "unstable": true
-      }
-    },
-    {
       "id": "bf15e909b0e0",
       "rule_id": "token-low-contrast",
       "title": "Token contrast pair fails WCAG",
@@ -195,6 +138,63 @@
       "blast_radius": {
         "scope": "design-system",
         "summary": "design-system wide"
+      }
+    },
+    {
+      "id": "66312d522b2b",
+      "rule_id": "clickable-div",
+      "title": "Non-interactive element with click handler",
+      "wcag": [
+        "2.1.1"
+      ],
+      "severity": "serious",
+      "scanner": "static",
+      "scanner_version": "2.5.0",
+      "detected_at": "2026-01-02T03:04:05Z",
+      "triage_group": "needs_input",
+      "fix_safety": "input-required",
+      "confidence": "high",
+      "status": "open",
+      "group_reason": "Finding requires human input, content intent, or scanner uncertainty before remediation.",
+      "location": {
+        "file": "fixtures/audit-full-static-token/source/index.html",
+        "line": 4,
+        "column": 5,
+        "url": "",
+        "selector": "",
+        "journey_step_id": ""
+      },
+      "mapping": {
+        "source_file": "fixtures/audit-full-static-token/source/index.html",
+        "source_line": 4,
+        "confidence": "high",
+        "explanation": "Mapped directly from the source scanner location."
+      },
+      "evidence": {
+        "snippet": "<div onClick=\"saveDraft()\">",
+        "dom_snippet": "",
+        "screenshot": "",
+        "axe_help_url": ""
+      },
+      "decision_required": {
+        "question": "Is this an action (replace with `<button type=\"button\">`) or navigation (replace with `<a href=\"\u2026\">`)? The closing tag also needs to change \u2014 the scanner only captured the opening tag.",
+        "options": []
+      },
+      "proposed_fix": {
+        "kind": "none",
+        "diff": "",
+        "notes": ""
+      },
+      "fingerprint": "clickable-div|.agents/skills/a11y-audit/fixtures/audit-full-static-token/source/index.html|line|line-4",
+      "confirmed_by": [
+        "static"
+      ],
+      "waiver": null,
+      "fingerprint_data": {
+        "fingerprint_version": "1.0",
+        "anchor_source": "line",
+        "anchor_value": "line-4",
+        "unstable": true
       }
     }
   ],

@@ -7,8 +7,8 @@
   "framework": "html",
   "summary": {
     "scanner_detected_issue_count": 2,
-    "auto_fixable_count": 1,
-    "needs_input_count": 1,
+    "auto_fixable_count": 0,
+    "needs_input_count": 2,
     "manual_review_count": 0,
     "waived_count": 0,
     "not_checked_count": 29,
@@ -65,7 +65,7 @@
     "tokens"
   ],
   "outcome": {
-    "body": "Found 2 active findings: 1 safe to fix now, 1 need your decision. Also generated 7 guided checks for this target.",
-    "recommended_first_step": "Recommended first step: say \"apply the safe fixes\". Open the report for all available next actions."
+    "body": "Found 2 active findings: 0 safe to fix now, 2 need your decision. Also generated 7 guided checks for this target.",
+    "recommended_first_step": "Recommended first step: say \"walk me through the decisions\". Open the report for all available next actions."
   }
 }

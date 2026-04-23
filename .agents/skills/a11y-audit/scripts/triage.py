@@ -59,7 +59,6 @@ SOURCE_PATH_LINE_RE = re.compile(
 # the issue's triage_hint from the scanner.
 RULE_TO_GROUP = {
     # Auto-fixable
-    "clickable-div": "auto",
     "redundant-role": "auto",
     "target-blank-no-noopener": "auto",
     "input-placeholder-as-label": "auto",
@@ -78,6 +77,12 @@ RULE_TO_GROUP = {
     "token-low-contrast": "input",
     "token-focus-indicator": "input",
     "token-color-only-semantic": "input",
+    # The scanner captures only the opening tag, but swapping a <div> for a
+    # <button> (or <a href>) requires rewriting the closing tag too — and the
+    # right element depends on whether the control is an action or navigation.
+    # Escalate to a decision rather than emit a diff that only rewrites half
+    # the element.
+    "clickable-div": "input",
     # Renaming an id can break CSS selectors, JS lookups (getElementById,
     # querySelector), ARIA references (aria-labelledby/aria-describedby,
     # for/htmlFor), and anchor hashes — escalate to a decision.
@@ -444,13 +449,6 @@ def render_fix(issue: dict) -> Optional[str]:
     fix_data = issue.get("fix_data", {})
     framework = issue.get("framework", "html")
 
-    if rule_id == "clickable-div":
-        element = fix_data.get("element", "div")
-        before = snippet
-        after = snippet.replace(f"<{element}", "<button type=\"button\"", 1)
-        after = after.replace(f"</{element}>", "</button>")
-        return diff(before, after)
-
     if rule_id == "redundant-role":
         role = fix_data.get("role", "")
         before = snippet
@@ -675,6 +673,11 @@ def decision_prompt(issue: dict) -> str:
             "This Tailwind color class likely fails WCAG AA 4.5:1 and has no safe "
             "mapping to a compliant shade. Pick a darker shade in the same family "
             "or a different accessible color class."
+        ),
+        "clickable-div": (
+            "Is this an action (replace with `<button type=\"button\">`) or "
+            "navigation (replace with `<a href=\"…\">`)? The closing tag also "
+            "needs to change — the scanner only captured the opening tag."
         ),
         "duplicate-id": (
             "Which element keeps the id, and what should the other one be renamed to? "
