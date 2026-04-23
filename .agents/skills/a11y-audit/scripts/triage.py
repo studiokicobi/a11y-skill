@@ -658,6 +658,20 @@ def humanize_rule(rule_id: str) -> str:
 
 
 def decision_prompt(issue: dict) -> str:
+    rule_id = issue["rule_id"]
+    if rule_id == "clickable-div":
+        fix_data = issue.get("fix_data", {})
+        if fix_data.get("has_interactive_role_and_tabindex"):
+            return (
+                "role + tabindex does not guarantee keyboard activation. Verify "
+                "that an Enter/Space keyboard handler exists, or replace with "
+                "a native element."
+            )
+        return (
+            "Is this an action (replace with `<button type=\"button\">`) or "
+            "navigation (replace with `<a href=\"…\">`)? The closing tag also "
+            "needs to change — the scanner only captured the opening tag."
+        )
     prompts = {
         "img-missing-alt": 'What does this image convey? (For decorative images, we\'ll use alt="".)',
         "input-missing-label": "What should this input be labeled?",
@@ -673,11 +687,6 @@ def decision_prompt(issue: dict) -> str:
             "This Tailwind color class likely fails WCAG AA 4.5:1 and has no safe "
             "mapping to a compliant shade. Pick a darker shade in the same family "
             "or a different accessible color class."
-        ),
-        "clickable-div": (
-            "Is this an action (replace with `<button type=\"button\">`) or "
-            "navigation (replace with `<a href=\"…\">`)? The closing tag also "
-            "needs to change — the scanner only captured the opening tag."
         ),
         "duplicate-id": (
             "Which element keeps the id, and what should the other one be renamed to? "

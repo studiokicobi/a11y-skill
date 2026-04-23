@@ -1,0 +1,13 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head><meta charset="utf-8"><title>Native button baseline</title></head>
+  <body>
+    <!-- Negative baseline for the clickable-div rule. Native <button> with
+         onClick must NOT fire — the rule targets non-interactive elements
+         co-opted into click handlers, not real buttons. Regression guard
+         for the role+tabindex suppression removal (H2). -->
+    <button type="button" onclick="doThing()">Submit</button>
+    <button type="submit" onclick="save()">Save</button>
+    <a href="/next" onclick="track()">Next</a>
+  </body>
+</html>

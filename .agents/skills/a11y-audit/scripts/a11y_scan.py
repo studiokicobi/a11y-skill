@@ -172,8 +172,10 @@ ON_CLICK_RE = re.compile(
     re.IGNORECASE,
 )
 # Interactive ARIA roles that make a non-semantic element keyboard-focusable
-# when paired with a tabindex. A <div role="button" tabindex="0" onClick>
-# behaves like a real button and should not be flagged as a missed handler.
+# when paired with a tabindex. The presence of this combination does NOT by
+# itself prove keyboard activation — that also requires an Enter/Space
+# handler — so the `clickable-div` rule still fires; the pairing is surfaced
+# via fix_data so triage can show the right decision prompt.
 INTERACTIVE_ROLE_RE = re.compile(
     r'\brole\s*=\s*["\']'
     r'(button|link|checkbox|radio|menuitem|menuitemcheckbox|menuitemradio|option|switch|tab)'
@@ -276,12 +278,9 @@ def rule_clickable_non_interactive(text, path, framework):
         attrs = m.group(2)
         if not ON_CLICK_RE.search(attrs):
             continue
-        # Skip: element already has an interactive ARIA role + a valid tabindex.
-        # That combo (e.g. `<div role="button" tabindex="0" onClick>`) is the
-        # documented pattern for custom-built interactive controls and is
-        # keyboard-accessible — flagging it would be a false positive.
-        if INTERACTIVE_ROLE_RE.search(attrs) and TABINDEX_ATTR_RE.search(attrs):
-            continue
+        has_role_and_tabindex = bool(
+            INTERACTIVE_ROLE_RE.search(attrs) and TABINDEX_ATTR_RE.search(attrs)
+        )
         line, col = pos_to_line_col(text, m.start())
         yield Issue(
             rule_id="clickable-div",
@@ -294,7 +293,11 @@ def rule_clickable_non_interactive(text, path, framework):
                      f"Use <button type=\"button\"> or <a href> instead."),
             framework=framework,
             triage_hint="auto",
-            fix_data={"element": element, "pattern": "div_to_button"},
+            fix_data={
+                "element": element,
+                "pattern": "div_to_button",
+                "has_interactive_role_and_tabindex": has_role_and_tabindex,
+            },
         )
 
 

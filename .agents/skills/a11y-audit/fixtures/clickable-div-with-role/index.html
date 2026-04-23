@@ -2,11 +2,13 @@
 <html lang="en">
   <head><meta charset="utf-8"><title>Clickable div regression</title></head>
   <body>
-    <!-- Should NOT flag: role="button" + tabindex="0" is the documented
-         pattern for custom interactive controls and is keyboard-accessible. -->
+    <!-- SHOULD flag (needs decision — role+tabindex case): the combo makes
+         the element focusable but does NOT guarantee Enter/Space activation.
+         The static scanner can't verify a keyboard handler exists, so we
+         surface this for the user to confirm. -->
     <div role="button" tabindex="0" onclick="doThing()">Submit</div>
 
-    <!-- Should NOT flag: role="link" + tabindex is also accessible. -->
+    <!-- SHOULD flag (needs decision — role+tabindex case): same reasoning. -->
     <span role="link" tabindex="0" onclick="nav()">Open profile</span>
 
     <!-- SHOULD flag: role="button" but no tabindex (not focusable). -->
