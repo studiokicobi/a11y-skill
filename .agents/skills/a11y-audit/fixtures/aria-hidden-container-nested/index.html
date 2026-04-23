@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head><meta charset="utf-8"><title>aria-hidden container nested</title></head>
+  <body>
+    <!-- H1 edge: the aria-hidden container wraps another container, which in
+         turn wraps the focusable leaf. Non-greedy matching walks to the
+         outer closing tag because the inner uses a different element name,
+         so the focusable descendant is still found. -->
+    <section aria-hidden="true">
+      <div class="panel">
+        <button type="button">Save</button>
+      </div>
+    </section>
+
+    <!-- Deeper nesting with mixed container tags. Same reasoning — as long
+         as no intermediate tag shares the outer's name, non-greedy finds
+         the true extent. -->
+    <aside aria-hidden="true">
+      <header>
+        <nav>
+          <a href="/home">Home</a>
+        </nav>
+      </header>
+    </aside>
+  </body>
+</html>

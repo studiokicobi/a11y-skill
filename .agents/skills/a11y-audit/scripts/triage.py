@@ -569,6 +569,11 @@ def render_fix(issue: dict) -> Optional[str]:
         )
 
     if rule_id == "aria-hidden-focusable":
+        # Container case routes to needs_input via classify(), so render_fix
+        # should never run for it; belt-and-braces guard in case a caller
+        # bypasses classify.
+        if fix_data.get("pattern") == "aria_hidden_container":
+            return None
         before = snippet
         # Match any quote style or unquoted value, tolerate whitespace
         # around `=`, and greedily capture whitespace on BOTH sides of the
@@ -672,6 +677,16 @@ def decision_prompt(issue: dict) -> str:
             "navigation (replace with `<a href=\"…\">`)? The closing tag also "
             "needs to change — the scanner only captured the opening tag."
         )
+    if rule_id == "aria-hidden-focusable":
+        fix_data = issue.get("fix_data", {})
+        if fix_data.get("pattern") == "aria_hidden_container":
+            return (
+                "A container with aria-hidden=\"true\" has a focusable descendant, "
+                "so keyboard users can land on something screen readers ignore. "
+                "Pick one: remove aria-hidden from the container, add "
+                "tabindex=\"-1\" to the descendant, or move the descendant out "
+                "of the hidden subtree."
+            )
     prompts = {
         "img-missing-alt": 'What does this image convey? (For decorative images, we\'ll use alt="".)',
         "input-missing-label": "What should this input be labeled?",
@@ -783,6 +798,12 @@ def classify(issue: dict) -> str:
     if rule_id == "tailwind-low-contrast":
         cls = issue.get("fix_data", {}).get("class", "")
         if not _tailwind_has_replacement(cls):
+            return "input"
+    if rule_id == "aria-hidden-focusable":
+        # Container case has no single correct autofix — the author must pick
+        # between removing aria-hidden, adding tabindex="-1" to the descendant,
+        # or restructuring the subtree. Element-self case stays auto.
+        if issue.get("fix_data", {}).get("pattern") == "aria_hidden_container":
             return "input"
     if rule_id in RULE_TO_GROUP:
         return RULE_TO_GROUP[rule_id]

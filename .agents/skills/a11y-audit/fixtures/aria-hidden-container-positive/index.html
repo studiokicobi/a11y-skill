@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head><meta charset="utf-8"><title>aria-hidden container positive</title></head>
+  <body>
+    <!-- H1 positive: container is aria-hidden="true" but keyboard users can
+         still focus the button inside. Rule should flag and route to
+         needs_input — the right fix (remove aria-hidden vs. add
+         tabindex="-1" to the button vs. hoist the button out of the subtree)
+         depends on author intent. -->
+    <div aria-hidden="true">
+      <button type="button">Save</button>
+    </div>
+
+    <!-- Same shape with an anchor. aria-hidden on the container hides the
+         link from assistive tech but keyboard users can still Tab to it. -->
+    <section aria-hidden="true">
+      <a href="/next">Continue</a>
+    </section>
+  </body>
+</html>

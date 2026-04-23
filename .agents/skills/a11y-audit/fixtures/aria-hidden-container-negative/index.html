@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head><meta charset="utf-8"><title>aria-hidden container negative</title></head>
+  <body>
+    <!-- H1 negative — aria-hidden="false" override: a descendant explicitly
+         opts back in. The scanner can't resolve which specific node is
+         re-exposed from text alone, so the conservative rule skips the whole
+         container to avoid a false positive. -->
+    <div aria-hidden="true">
+      <button type="button" aria-hidden="false">Save</button>
+    </div>
+
+    <!-- H1 negative — all focusable descendants have tabindex="-1": they're
+         out of the tab order, so aria-hidden on the container is no longer a
+         keyboard hazard for them. -->
+    <div aria-hidden="true">
+      <button type="button" tabindex="-1">Hidden</button>
+      <a href="/x" tabindex="-1">Also hidden</a>
+    </div>
+
+    <!-- H1 negative — container with no focusable descendants at all. -->
+    <div aria-hidden="true">
+      <span>Decorative label</span>
+      <p>Just text.</p>
+    </div>
+
+    <!-- H1 negative — the existing element-self rule already covers a
+         focusable element with aria-hidden="true" (handled as `fix_aria_hidden`,
+         autofixable). The container rule must NOT double-emit for the same
+         root cause, so it skips matches where the outer tag is itself
+         focusable. Flagged once by rule_aria_hidden_focusable, not twice. -->
+    <button type="button" aria-hidden="true">
+      Already covered
+    </button>
+  </body>
+</html>

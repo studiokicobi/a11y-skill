@@ -217,6 +217,14 @@ TABINDEX_RE = re.compile(
     r'\btab[Ii]ndex\s*=\s*(?:["\'](\d+)["\']|\{(\d+)\})',
     re.IGNORECASE,
 )
+# Matches any tabindex with a leading minus — used by the container-focusable
+# rule to skip descendants already removed from the tab order. TABINDEX_RE
+# only captures positive integers (it drives the positive-tabindex rule), so
+# negative values need a dedicated pattern.
+NEGATIVE_TABINDEX_RE = re.compile(
+    r'\btab[Ii]ndex\s*=\s*(?:["\']-\d+["\']|\{-\d+\})',
+    re.IGNORECASE,
+)
 
 FOCUSABLE_ARIA_HIDDEN_RE = re.compile(
     r"<(a|button|input|select|textarea)\b([^>]*?)>",
@@ -224,6 +232,18 @@ FOCUSABLE_ARIA_HIDDEN_RE = re.compile(
 )
 ARIA_HIDDEN_TRUE_RE = re.compile(r'\baria-hidden\s*=\s*["\']true["\']',
                                  re.IGNORECASE)
+ARIA_HIDDEN_FALSE_RE = re.compile(r'\baria-hidden\s*=\s*["\']false["\']',
+                                  re.IGNORECASE)
+# Non-greedy match to the first closing tag of the same name. This is
+# intentionally conservative: for `<div aria-hidden="true"><div/><button/></div>`
+# the inner `</div>` ends the match before the button is seen. That produces
+# false negatives on same-tag nesting but avoids false positives when the
+# actual extent of `aria-hidden` isn't resolvable from text alone.
+ARIA_HIDDEN_CONTAINER_RE = re.compile(
+    r'<(\w+)\b([^>]*?\baria-hidden\s*=\s*["\']true["\'][^>]*?)>(.*?)</\1>',
+    re.IGNORECASE | re.DOTALL,
+)
+FOCUSABLE_ELEMENT_TAG_NAMES = frozenset({"a", "button", "input", "select", "textarea"})
 
 # Duplicate id detection uses the existing ID_ATTR_RE to collect every
 # id value and its offset within the file.
@@ -610,6 +630,56 @@ def rule_aria_hidden_focusable(text, path, framework):
         )
 
 
+def rule_aria_hidden_container_focusable(text, path, framework):
+    # Companion to rule_aria_hidden_focusable: flags the "contains a focusable
+    # descendant" half of the reference contract (triage-rules.md). Conservative
+    # same-file detection — no cross-file traversal, no DOM parse, no JSX
+    # component resolution. Unlike the element-self case, the correct fix here
+    # (remove aria-hidden on the container vs. add tabindex="-1" on the
+    # descendant vs. restructure the subtree) depends on intent, so this
+    # routes to needs_input via fix_data["pattern"] = "aria_hidden_container".
+    for m in ARIA_HIDDEN_CONTAINER_RE.finditer(text):
+        element = m.group(1).lower()
+        # The element-self rule already covers focusable tags with
+        # aria-hidden="true". Skip to avoid double-emit on the same root cause.
+        if element in FOCUSABLE_ELEMENT_TAG_NAMES:
+            continue
+        inner = m.group(3)
+        # An `aria-hidden="false"` inside suggests an intentional override on
+        # some descendant. Text-only matching can't tell which descendant is
+        # overridden, so skip the whole container — conservative by design.
+        if ARIA_HIDDEN_FALSE_RE.search(inner):
+            continue
+        descendant_found = False
+        for fm in FOCUSABLE_ARIA_HIDDEN_RE.finditer(inner):
+            focus_attrs = fm.group(2)
+            # tabindex="-1" takes the descendant out of the tab order, so the
+            # container's aria-hidden is no longer a keyboard hazard for that
+            # element. Skip the descendant and keep scanning for others.
+            if NEGATIVE_TABINDEX_RE.search(focus_attrs):
+                continue
+            descendant_found = True
+            break
+        if not descendant_found:
+            continue
+        line, col = pos_to_line_col(text, m.start())
+        yield Issue(
+            rule_id="aria-hidden-focusable",
+            wcag="4.1.2",
+            file=str(path),
+            line=line,
+            col=col,
+            snippet=snippet_around(text, m.start(), m.end()),
+            message=(f"<{element}> with aria-hidden=\"true\" contains a focusable "
+                     f"descendant. Remove aria-hidden from the container, add "
+                     f"tabindex=\"-1\" to the descendant, or move the descendant "
+                     f"out of the hidden subtree."),
+            framework=framework,
+            triage_hint="input",
+            fix_data={"element": element, "pattern": "aria_hidden_container"},
+        )
+
+
 # -----------------------------------------------------------------------------
 # Line-oriented rules
 # -----------------------------------------------------------------------------
@@ -695,6 +765,7 @@ TAG_RULES = [
     rule_media_autoplay,
     rule_positive_tabindex,
     rule_aria_hidden_focusable,
+    rule_aria_hidden_container_focusable,
     rule_duplicate_id,
     rule_icon_only_control,
 ]

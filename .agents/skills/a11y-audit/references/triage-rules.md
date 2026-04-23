@@ -25,7 +25,7 @@ These fixes have a deterministic correct output given what the scanner already k
 | `tailwind-low-contrast` | 1.4.3 | Tailwind utility class listed in `references/contrast-alternatives.md` that fails AA on the likely background | Swap to the mapped accessible Tailwind class |
 | `css-low-contrast` | 1.4.3 | Hex/rgb/named color in CSS that's listed in `references/contrast-alternatives.md` | Swap to the mapped accessible color |
 | `outline-none` | 2.4.7, 2.4.11 | `outline: none` / `outline: 0` in CSS on an interactive selector with no `:focus-visible` replacement | Append a `:focus-visible` block with a visible outline |
-| `aria-hidden-focusable` | 4.1.2 | `aria-hidden="true"` on an element that is or contains a focusable control | Remove the `aria-hidden` attribute |
+| `aria-hidden-focusable` | 4.1.2 | `aria-hidden="true"` on a focusable element itself (`<a>`/`<button>`/`<input>`/`<select>`/`<textarea>`) | Remove the `aria-hidden` attribute |
 
 ---
 
@@ -43,6 +43,7 @@ The agent can locate the issue and describe the fix shape, but the *content* nee
 | `icon-only-control` | 4.1.2 | Button/link whose only content is an icon and that has no `aria-label` / `aria-labelledby` / visible text | "What does this control do? We'll add an `aria-label` so screen readers announce its purpose." |
 | `duplicate-id` | 4.1.1 | Same `id` on two or more elements in the same document | "Which element keeps the id, and what should the other one be renamed to? (Search the codebase first — CSS selectors, JS lookups, aria-labelledby/aria-describedby, label[for], and anchor #hashes may depend on it.)" |
 | `html-missing-lang` | 3.1.1 | `<html>` without a `lang` attribute | "What BCP-47 language tag should go on `<html lang>`? (e.g. `en`, `en-GB`, `sv`, `fr-CA`. Screen readers use this to pick pronunciation, so it must match the document's primary language — don't just default to `en`.)" |
+| `aria-hidden-focusable` (container) | 4.1.2 | `aria-hidden="true"` on a container element that has a focusable descendant (same `rule_id` as the auto case; distinguished by `fix_data.pattern == "aria_hidden_container"`). Conservative same-file detection — skipped when any nested `aria-hidden="false"` override or `tabindex="-1"` on every focusable descendant suppresses the hazard. | "A container with aria-hidden=\"true\" has a focusable descendant, so keyboard users can land on something screen readers ignore. Pick one: remove aria-hidden from the container, add tabindex=\"-1\" to the descendant, or move the descendant out of the hidden subtree." |
 | `token-low-contrast` | 1.4.3 | Design-token pair whose computed contrast fails AA | "Which nearby compliant token value should replace this failing pair?" |
 | `token-focus-indicator` | 2.4.7, 2.4.11 | Focus-indicator token missing or below the 3:1 / 2-px threshold | "Should we strengthen the focus ring color, width, or both for this token set?" |
 | `token-color-only-semantic` | 1.4.1 | Semantic token (success/error/warning/info) that relies on color alone — no paired icon, label, or shape | "What non-color cue should accompany this semantic token across the design system?" |
