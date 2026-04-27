@@ -15,7 +15,7 @@
       "wcag": "2.1.1",
       "file": "fixtures/react-multiline/ProductCard.tsx",
       "line": 11,
-      "triage_hint": "auto"
+      "triage_hint": "input"
     },
     {
       "rule_id": "outline-none",

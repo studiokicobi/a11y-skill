@@ -8,7 +8,7 @@
       "wcag": "2.1.1",
       "file": "fixtures/svelte-events/Component.svelte",
       "line": 5,
-      "triage_hint": "auto"
+      "triage_hint": "input"
     }
   ]
 }

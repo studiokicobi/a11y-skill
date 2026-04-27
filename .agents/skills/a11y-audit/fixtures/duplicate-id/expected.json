@@ -8,14 +8,14 @@
       "wcag": "4.1.1",
       "file": "fixtures/duplicate-id/index.html",
       "line": 10,
-      "triage_hint": "auto"
+      "triage_hint": "input"
     },
     {
       "rule_id": "duplicate-id",
       "wcag": "4.1.1",
       "file": "fixtures/duplicate-id/index.html",
       "line": 12,
-      "triage_hint": "auto"
+      "triage_hint": "input"
     }
   ]
 }

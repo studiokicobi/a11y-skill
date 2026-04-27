@@ -18,7 +18,6 @@ These fixes have a deterministic correct output given what the scanner already k
 
 | Rule ID | WCAG | What the scanner detects | Auto-applied fix |
 | --- | --- | --- | --- |
-| `clickable-div` | 2.1.1, 4.1.2 | `<div>`/`<span>`/heading/etc with an onClick handler (React `onClick`, Vue/HTML `onclick`, Svelte `on:click`, Angular `(click)`) and no interactive role + tabindex pair | Replace element with `<button type="button">` |
 | `redundant-role` | 4.1.2 | ARIA role that duplicates the element's implicit role (`<nav role="navigation">`, `<main role="main">`, `<button role="button">`, `<article role="article">`) | Remove the redundant `role` attribute |
 | `target-blank-no-noopener` | best practice | `<a target="_blank">` without `rel="noopener"` / `rel="noreferrer"` | Merge `noopener noreferrer` into the existing `rel` (or add `rel="noopener noreferrer"` if absent) |
 | `input-placeholder-as-label` | 1.3.1, 3.3.2 | `<input placeholder="...">` with no associated `<label>` | Add a `<label for="...">` using the placeholder text, and give the input a matching `id` (framework-aware: `htmlFor` vs `for`) |
@@ -35,6 +34,7 @@ The agent can locate the issue and describe the fix shape, but the *content* nee
 
 | Rule ID | WCAG | What the scanner detects | Decision prompt |
 | --- | --- | --- | --- |
+| `clickable-div` | 2.1.1, 4.1.2 | `<div>`/`<span>`/heading/etc with an onClick handler (React `onClick`, Vue/HTML `onclick`, Svelte `on:click`, Angular `(click)`) and no interactive role + tabindex pair | "Is this control an action (`<button type=\"button\">`) or navigation (`<a href>`)? The scanner only sees the opening tag, so the closing tag rewrite + element choice need a human." |
 | `img-missing-alt` | 1.1.1 | `<img>` with no `alt` attribute | "What does this image convey? (For decorative images, we'll use `alt=""`.)" |
 | `input-missing-label` | 1.3.1 | `<input>`/`<select>`/`<textarea>` with no associated `<label>` and no `aria-label` / `aria-labelledby` | "What should this input be labeled?" |
 | `positive-tabindex` | 2.4.3 | `tabindex` value greater than 0 | "Is this tab order deliberate? If not, we'll remove the positive tabindex." |

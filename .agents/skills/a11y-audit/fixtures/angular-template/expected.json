@@ -22,7 +22,7 @@
       "wcag": "2.1.1",
       "file": "fixtures/angular-template/app.component.html",
       "line": 7,
-      "triage_hint": "auto"
+      "triage_hint": "input"
     },
     {
       "rule_id": "input-placeholder-as-label",

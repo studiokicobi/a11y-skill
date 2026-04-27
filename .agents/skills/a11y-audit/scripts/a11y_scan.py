@@ -312,7 +312,13 @@ def rule_clickable_non_interactive(text, path, framework):
             message=(f"<{element}> with onClick is not keyboard-accessible. "
                      f"Use <button type=\"button\"> or <a href> instead."),
             framework=framework,
-            triage_hint="auto",
+            # input, not auto: rewriting <div onClick> to <button> requires
+            # closing-tag rewrite + a button-vs-link decision the scanner
+            # can't make from the opening tag alone. RULE_TO_GROUP has
+            # already overridden this to "input" in the canonical map; the
+            # scanner-level hint is matched here so consumers reading raw
+            # scanner JSON see the same fix-autonomy signal.
+            triage_hint="input",
             fix_data={
                 "element": element,
                 "pattern": "div_to_button",
@@ -394,7 +400,11 @@ def rule_html_lang(text, path, framework):
             snippet=snippet_around(text, m.start(), m.end()),
             message="<html> element missing lang attribute.",
             framework=framework,
-            triage_hint="auto",
+            # input, not auto: the right BCP-47 tag depends on the document's
+            # primary language (and locale variant) — the scanner can't infer
+            # it. RULE_TO_GROUP overrides to "input"; matched here so raw
+            # scanner consumers see the same hint.
+            triage_hint="input",
             fix_data={"pattern": "add_lang"},
         )
 
@@ -531,7 +541,12 @@ def rule_duplicate_id(text, path, framework):
                     "within a document."
                 ),
                 framework=framework,
-                triage_hint="auto",
+                # input, not auto: renaming an id can break CSS selectors,
+                # JS lookups, ARIA references (aria-labelledby/describedby,
+                # for/htmlFor), and anchor hashes — escalate to a human
+                # decision. RULE_TO_GROUP overrides to "input"; matched
+                # here so raw scanner consumers see the same hint.
+                triage_hint="input",
                 fix_data={
                     "id": id_value,
                     "first_line": first_seen[id_value],

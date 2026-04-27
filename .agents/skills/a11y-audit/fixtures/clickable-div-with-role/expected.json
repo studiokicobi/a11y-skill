@@ -8,35 +8,35 @@
       "wcag": "2.1.1",
       "file": "fixtures/clickable-div-with-role/index.html",
       "line": 9,
-      "triage_hint": "auto"
+      "triage_hint": "input"
     },
     {
       "rule_id": "clickable-div",
       "wcag": "2.1.1",
       "file": "fixtures/clickable-div-with-role/index.html",
       "line": 12,
-      "triage_hint": "auto"
+      "triage_hint": "input"
     },
     {
       "rule_id": "clickable-div",
       "wcag": "2.1.1",
       "file": "fixtures/clickable-div-with-role/index.html",
       "line": 15,
-      "triage_hint": "auto"
+      "triage_hint": "input"
     },
     {
       "rule_id": "clickable-div",
       "wcag": "2.1.1",
       "file": "fixtures/clickable-div-with-role/index.html",
       "line": 19,
-      "triage_hint": "auto"
+      "triage_hint": "input"
     },
     {
       "rule_id": "clickable-div",
       "wcag": "2.1.1",
       "file": "fixtures/clickable-div-with-role/index.html",
       "line": 22,
-      "triage_hint": "auto"
+      "triage_hint": "input"
     }
   ]
 }
