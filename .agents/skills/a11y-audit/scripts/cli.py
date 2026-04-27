@@ -664,6 +664,7 @@ def _write_manifest(
     scanner_payloads: Dict[str, Optional[dict]],
     input_copies: Dict[str, str],
     scope_metadata: dict,
+    invocation_argv: Optional[List[str]] = None,
     baseline_output: Optional[str] = None,
     outcome: Optional[dict] = None,
 ) -> None:
@@ -698,6 +699,16 @@ def _write_manifest(
             if scanner_payloads.get(scanner_name)
         ],
     }
+    if invocation_argv is not None:
+        # Argv-as-passed for reproducibility — the subcommand is the first
+        # element. Paths in argv may include absolute machine paths; the
+        # input_copies block above carries the redacted artifact-side view,
+        # so the raw argv stays here as the most faithful record of what
+        # the operator ran. Codex M2.
+        manifest["invocation"] = {
+            "command": invocation_argv[0] if invocation_argv else "",
+            "argv": list(invocation_argv),
+        }
     if baseline_output:
         manifest["baseline_output"] = baseline_output
     if outcome:
@@ -1004,6 +1015,7 @@ def _audit_main(argv: List[str]) -> int:
         scanner_payloads=payloads,
         input_copies=input_copies,
         scope_metadata=outputs["scope_metadata"],
+        invocation_argv=argv,
         baseline_output=baseline_output_display,
         outcome=outcome_payload,
     )
@@ -1088,6 +1100,7 @@ def _ci_main(argv: List[str]) -> int:
         scanner_payloads=payloads,
         input_copies=input_copies,
         scope_metadata=outputs["scope_metadata"],
+        invocation_argv=argv,
     )
 
     print(f"Accessibility check: {len(outputs['blockers'])} blocking issue(s). Summary: {_display_path(paths['summary_md'])}")

@@ -60,6 +60,20 @@
   "scanners_ran": [
     "static"
   ],
+  "invocation": {
+    "command": "audit",
+    "argv": [
+      "audit",
+      "--output-dir",
+      "artifacts/audit-quick-static-audit-output",
+      "--detected-at",
+      "2026-01-02T03:04:05Z",
+      "--mode",
+      "quick",
+      "--path",
+      "fixtures/audit-quick-static/source"
+    ]
+  },
   "outcome": {
     "body": "Found 1 active findings: 0 safe to fix now, 1 need your decision. Also generated 7 guided checks for this target.",
     "recommended_first_step": "Recommended first step: say \"walk me through the decisions\". Open the report for all available next actions."
