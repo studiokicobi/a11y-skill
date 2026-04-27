@@ -1,0 +1,11 @@
+{
+  "url": "https://example.com",
+  "runtime": {
+    "auth": {
+      "mode": "headers",
+      "headers": {
+        "Authorization": "Bearer sk_live_nested"
+      }
+    }
+  }
+}

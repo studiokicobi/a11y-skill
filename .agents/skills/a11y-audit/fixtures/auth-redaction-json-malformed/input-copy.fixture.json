@@ -1,0 +1,8 @@
+{
+  "command": "ci",
+  "runtime": "pre-computed-runtime.json",
+  "runtime_config": "malformed-auth.json",
+  "kind": "json-placeholder",
+  "expected_reason": "json-parse-error",
+  "no_leak_strings": ["Bearer sk_live_malformed"]
+}

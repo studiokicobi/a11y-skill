@@ -200,16 +200,62 @@ def _redact_auth_subtree(node):
     return node
 
 
+def _redact_auth_keys_anywhere(node):
+    """Walk a parsed JSON value and redact any value under an `auth` key,
+    no matter how deeply nested. Catches both nested config shapes
+    (`{"runtime": {"auth": {...}}}`) and scalar auth values
+    (`{"auth": "Bearer ..."}`) that the top-level-only check missed.
+    """
+    if isinstance(node, dict):
+        result = {}
+        for key, value in node.items():
+            if isinstance(key, str) and key.lower() == "auth":
+                if isinstance(value, (dict, list)):
+                    result[key] = _redact_auth_subtree(value)
+                elif isinstance(value, str) and value.startswith(("env:", "file:")):
+                    result[key] = value
+                elif value is None or isinstance(value, bool):
+                    result[key] = value
+                else:
+                    result[key] = REDACTION_MARKER
+            elif isinstance(value, (dict, list)):
+                result[key] = _redact_auth_keys_anywhere(value)
+            else:
+                result[key] = value
+        return result
+    if isinstance(node, list):
+        return [_redact_auth_keys_anywhere(item) for item in node]
+    return node
+
+
 def _redact_config_text_json(raw: str) -> str:
-    """Parse, redact the `auth` subtree, re-serialize. Preserves a trailing
-    newline if the source had one so file diffs stay minimal.
+    """Parse, recursively redact every `auth` subtree at any depth,
+    re-serialize. Preserves a trailing newline if the source had one so
+    file diffs stay minimal.
     """
     trailing_newline = raw.endswith("\n")
-    data = json.loads(raw)
-    if isinstance(data, dict) and isinstance(data.get("auth"), (dict, list)):
-        data["auth"] = _redact_auth_subtree(data["auth"])
+    data = _redact_auth_keys_anywhere(json.loads(raw))
     out = json.dumps(data, indent=2)
     return out + "\n" if trailing_newline else out
+
+
+def _build_json_placeholder(reason: str, original_source: str) -> str:
+    """Self-describing JSON placeholder for when the runtime/journey config
+    can't be structurally redacted. Used for malformed JSON and unreadable
+    bytes. Stays valid JSON so downstream tooling that walks artifact
+    bundles doesn't crash on the placeholder.
+    """
+    payload = {
+        "_redacted_by": "a11y-audit",
+        "_reason": reason,
+        "_original_source": original_source,
+        "_note": (
+            "Original JSON runtime config could not be structurally "
+            "redacted. Fail closed: artifact bundles never contain raw "
+            "auth payloads from configs the redactor could not parse."
+        ),
+    }
+    return json.dumps(payload, indent=2) + "\n"
 
 
 # Block-style YAML detection: matches the common config shape where `auth:`
@@ -322,13 +368,38 @@ def _copy_named_input(source: Optional[str], dest_dir: Path, dest_name: str):
             raw = None
         lowered_suffix = suffix.lower()
         if lowered_suffix.endswith(".json"):
+            source_label = _safe_source_label(source_path)
             if raw is None:
-                shutil.copyfile(source_path, dest_path)
-                return dest_path.name if dest_path.is_file() else None
+                # Unreadable as text — fail closed by emitting a placeholder.
+                # Avoids any chance of binary or non-UTF-8 bytes carrying
+                # secrets being copied verbatim.
+                placeholder = _build_json_placeholder("json-unreadable", source_label)
+                dest_path.write_text(placeholder, encoding="utf-8")
+                if not dest_path.is_file():
+                    return None
+                return {
+                    "copied": dest_path.name,
+                    "mode": "placeholder",
+                    "original_source": source_label,
+                    "reason": "json-unreadable",
+                }
             try:
                 redacted = _redact_config_text_json(raw)
             except (ValueError, json.JSONDecodeError):
-                redacted = raw
+                # Parse error — fail closed. We can't structurally redact a
+                # malformed config, so emit a placeholder rather than copy
+                # raw bytes (which may carry an Authorization header next
+                # to the syntax error).
+                placeholder = _build_json_placeholder("json-parse-error", source_label)
+                dest_path.write_text(placeholder, encoding="utf-8")
+                if not dest_path.is_file():
+                    return None
+                return {
+                    "copied": dest_path.name,
+                    "mode": "placeholder",
+                    "original_source": source_label,
+                    "reason": "json-parse-error",
+                }
             dest_path.write_text(redacted, encoding="utf-8")
             return dest_path.name if dest_path.is_file() else None
         if lowered_suffix.endswith((".yaml", ".yml")):

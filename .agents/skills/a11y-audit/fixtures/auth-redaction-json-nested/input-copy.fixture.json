@@ -1,0 +1,11 @@
+{
+  "command": "ci",
+  "runtime": "pre-computed-runtime.json",
+  "runtime_config": "nested-auth.json",
+  "kind": "json-redacted",
+  "must_contain": [
+    "\"mode\": \"headers\"",
+    "\"Authorization\": \"[REDACTED by a11y-audit]\""
+  ],
+  "no_leak_strings": ["Bearer sk_live_nested"]
+}

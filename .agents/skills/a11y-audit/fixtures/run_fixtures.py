@@ -567,18 +567,24 @@ def run_input_copy_fixture(fixture_dir: Path, update: bool = False) -> bool:
           "command": "ci",
           "runtime": "pre-computed-runtime.json",
           "runtime_config": "runtime.config.yaml",
+          "kind": "yaml-placeholder",          # default; or json-redacted, json-placeholder
+          "expected_filename": "runtime.config.yaml",  # path under inputs/ (default per kind)
+          "expected_reason": "json-parse-error",       # required for *-placeholder kinds
+          "must_contain": ["[REDACTED by a11y-audit]"],
           "no_leak_strings": ["Bearer sk_live_abcdef"]
         }
 
-    Assertions:
+    Per-kind assertions:
+      - yaml-placeholder: body matches `_YAML_PLACEHOLDER_TEMPLATE`; manifest
+        entry is a dict with mode=placeholder, reason=yaml-auth-not-round-tripped.
+      - json-redacted: body is valid JSON, contains every `must_contain` string;
+        manifest entry is a plain string `"inputs/<filename>"`.
+      - json-placeholder: body is valid JSON shaped like `_build_json_placeholder`
+        output (`_redacted_by`, `_reason` matches `expected_reason`); manifest
+        entry is a dict with mode=placeholder and the matching reason.
+    Universal:
       - Exit code 0 (no --ci flag, so blockers don't fail).
-      - `inputs/runtime.config.yaml` body matches `_YAML_PLACEHOLDER_TEMPLATE`
-        with the original source path substituted in (template imported from
-        cli.py so a template change updates the test in lockstep).
-      - `manifest.inputs.runtime_config` is a dict with mode=placeholder,
-        the recorded original_source matches the resolved fixture path,
-        and the copied path is `inputs/runtime.config.yaml`.
-      - None of the `no_leak_strings` appear anywhere in the output tree.
+      - None of `no_leak_strings` appears anywhere in the output tree.
     """
     name = fixture_dir.name
     spec_path = fixture_dir / "input-copy.fixture.json"
@@ -587,6 +593,7 @@ def run_input_copy_fixture(fixture_dir: Path, update: bool = False) -> bool:
     runtime_path = (fixture_dir / spec["runtime"]).resolve()
     runtime_config_path = (fixture_dir / spec["runtime_config"]).resolve()
     no_leak_strings = spec.get("no_leak_strings", [])
+    kind = spec.get("kind", "yaml-placeholder")
 
     output_dir = Path(f"/tmp/input-copy-fixture-{name}")
     if output_dir.exists():
@@ -605,53 +612,26 @@ def run_input_copy_fixture(fixture_dir: Path, update: bool = False) -> bool:
         print(f"        stderr: {result.stderr.strip()}")
         return False
 
-    scripts_dir = str(SKILL_ROOT / "scripts")
-    if scripts_dir not in sys.path:
-        sys.path.insert(0, scripts_dir)
-    try:
-        from cli import _YAML_PLACEHOLDER_TEMPLATE  # type: ignore
-    except ImportError as exc:
-        print(f"  FAIL {name}: could not import _YAML_PLACEHOLDER_TEMPLATE ({exc})")
-        return False
-
     try:
         rel_source = runtime_config_path.relative_to(SKILL_ROOT.resolve()).as_posix()
     except ValueError:
         rel_source = runtime_config_path.name
-    expected_placeholder = _YAML_PLACEHOLDER_TEMPLATE.format(original_source=rel_source)
-
-    placeholder_path = output_dir / "inputs" / "runtime.config.yaml"
-    if not placeholder_path.exists():
-        print(f"  FAIL {name}: placeholder file not written at {placeholder_path}")
-        shutil.rmtree(output_dir)
-        return False
-
-    actual_placeholder = placeholder_path.read_text(encoding="utf-8")
-    ok = True
-    if actual_placeholder == expected_placeholder:
-        print(f"  PASS {name}: placeholder body matched template")
-    else:
-        print(f"  FAIL {name}: placeholder body differed from template")
-        print(f"        expected:\n{expected_placeholder}")
-        print(f"        actual:\n{actual_placeholder}")
-        ok = False
 
     manifest_path = output_dir / "manifest.json"
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     rc_entry = manifest.get("inputs", {}).get("runtime_config")
-    expected_entry = {
-        "copied": "inputs/runtime.config.yaml",
-        "mode": "placeholder",
-        "original_source": rel_source,
-        "reason": "yaml-auth-not-round-tripped",
-    }
-    if rc_entry == expected_entry:
-        print(f"  PASS {name}: manifest input entry recorded placeholder mode + source")
+
+    ok = True
+    if kind == "yaml-placeholder":
+        ok = _validate_yaml_placeholder(name, output_dir, rel_source, rc_entry) and ok
+    elif kind == "json-redacted":
+        ok = _validate_json_redacted(name, output_dir, rc_entry, spec) and ok
+    elif kind == "json-placeholder":
+        ok = _validate_json_placeholder(name, output_dir, rel_source, rc_entry, spec) and ok
     else:
-        print(f"  FAIL {name}: manifest input entry mismatch")
-        print(f"        expected: {expected_entry!r}")
-        print(f"        actual:   {rc_entry!r}")
-        ok = False
+        print(f"  FAIL {name}: unknown input-copy fixture kind {kind!r}")
+        shutil.rmtree(output_dir)
+        return False
 
     leaked = []
     for f in output_dir.rglob("*"):
@@ -673,6 +653,130 @@ def run_input_copy_fixture(fixture_dir: Path, update: bool = False) -> bool:
         print(f"  PASS {name}: no raw auth values found in output ({len(no_leak_strings)} string(s) checked)")
 
     shutil.rmtree(output_dir)
+    return ok
+
+
+def _validate_yaml_placeholder(name: str, output_dir: Path, rel_source: str, rc_entry) -> bool:
+    scripts_dir = str(SKILL_ROOT / "scripts")
+    if scripts_dir not in sys.path:
+        sys.path.insert(0, scripts_dir)
+    try:
+        from cli import _YAML_PLACEHOLDER_TEMPLATE  # type: ignore
+    except ImportError as exc:
+        print(f"  FAIL {name}: could not import _YAML_PLACEHOLDER_TEMPLATE ({exc})")
+        return False
+    expected_placeholder = _YAML_PLACEHOLDER_TEMPLATE.format(original_source=rel_source)
+    placeholder_path = output_dir / "inputs" / "runtime.config.yaml"
+    if not placeholder_path.exists():
+        print(f"  FAIL {name}: placeholder file not written at {placeholder_path}")
+        return False
+    actual = placeholder_path.read_text(encoding="utf-8")
+    ok = True
+    if actual == expected_placeholder:
+        print(f"  PASS {name}: placeholder body matched template")
+    else:
+        print(f"  FAIL {name}: placeholder body differed from template")
+        print(f"        expected:\n{expected_placeholder}")
+        print(f"        actual:\n{actual}")
+        ok = False
+    expected_entry = {
+        "copied": "inputs/runtime.config.yaml",
+        "mode": "placeholder",
+        "original_source": rel_source,
+        "reason": "yaml-auth-not-round-tripped",
+    }
+    if rc_entry == expected_entry:
+        print(f"  PASS {name}: manifest input entry recorded placeholder mode + source")
+    else:
+        print(f"  FAIL {name}: manifest input entry mismatch")
+        print(f"        expected: {expected_entry!r}")
+        print(f"        actual:   {rc_entry!r}")
+        ok = False
+    return ok
+
+
+def _resolve_input_copy_path(name: str, output_dir: Path, spec: dict) -> Optional[Path]:
+    expected = spec.get("expected_filename")
+    if expected:
+        return output_dir / "inputs" / expected
+    candidates = sorted((output_dir / "inputs").glob("runtime.config*.json"))
+    if not candidates:
+        return None
+    if len(candidates) > 1:
+        print(f"  FAIL {name}: multiple runtime.config*.json candidates; set expected_filename in spec")
+        return None
+    return candidates[0]
+
+
+def _validate_json_redacted(name: str, output_dir: Path, rc_entry, spec: dict) -> bool:
+    copied_path = _resolve_input_copy_path(name, output_dir, spec)
+    if copied_path is None or not copied_path.exists():
+        print(f"  FAIL {name}: redacted JSON file not found in inputs/")
+        return False
+    body = copied_path.read_text(encoding="utf-8")
+    try:
+        json.loads(body)
+    except json.JSONDecodeError as exc:
+        print(f"  FAIL {name}: redacted file is not valid JSON: {exc}")
+        return False
+    ok = True
+    must_contain = spec.get("must_contain", ["[REDACTED by a11y-audit]"])
+    for needle in must_contain:
+        if needle in body:
+            print(f"  PASS {name}: redacted file contains {needle!r}")
+        else:
+            print(f"  FAIL {name}: redacted file missing required string {needle!r}")
+            ok = False
+    expected_manifest = f"inputs/{copied_path.name}"
+    if rc_entry == expected_manifest:
+        print(f"  PASS {name}: manifest input entry is a plain string path")
+    else:
+        print(f"  FAIL {name}: manifest input entry mismatch")
+        print(f"        expected: {expected_manifest!r}")
+        print(f"        actual:   {rc_entry!r}")
+        ok = False
+    return ok
+
+
+def _validate_json_placeholder(name: str, output_dir: Path, rel_source: str, rc_entry, spec: dict) -> bool:
+    copied_path = _resolve_input_copy_path(name, output_dir, spec)
+    if copied_path is None or not copied_path.exists():
+        print(f"  FAIL {name}: JSON placeholder file not found in inputs/")
+        return False
+    body = copied_path.read_text(encoding="utf-8")
+    try:
+        parsed = json.loads(body)
+    except json.JSONDecodeError as exc:
+        print(f"  FAIL {name}: placeholder body is not valid JSON: {exc}")
+        return False
+    ok = True
+    if parsed.get("_redacted_by") == "a11y-audit":
+        print(f"  PASS {name}: placeholder body has _redacted_by marker")
+    else:
+        print(f"  FAIL {name}: placeholder body missing _redacted_by marker (got {parsed.get('_redacted_by')!r})")
+        ok = False
+    expected_reason = spec.get("expected_reason")
+    if not expected_reason:
+        print(f"  FAIL {name}: expected_reason missing in spec for json-placeholder kind")
+        return False
+    if parsed.get("_reason") == expected_reason:
+        print(f"  PASS {name}: placeholder _reason matches {expected_reason!r}")
+    else:
+        print(f"  FAIL {name}: placeholder _reason mismatch (got {parsed.get('_reason')!r}, expected {expected_reason!r})")
+        ok = False
+    expected_entry = {
+        "copied": f"inputs/{copied_path.name}",
+        "mode": "placeholder",
+        "original_source": rel_source,
+        "reason": expected_reason,
+    }
+    if rc_entry == expected_entry:
+        print(f"  PASS {name}: manifest input entry recorded placeholder mode + reason")
+    else:
+        print(f"  FAIL {name}: manifest input entry mismatch")
+        print(f"        expected: {expected_entry!r}")
+        print(f"        actual:   {rc_entry!r}")
+        ok = False
     return ok
 
 
@@ -1220,6 +1324,7 @@ def main():
             or (d / "expected.exit.txt").exists()
             or (d / "expected.error.txt").exists()
             or (d / "cli-error.fixture.json").exists()
+            or (d / "input-copy.fixture.json").exists()
             or (args.live_runtime and ((d / "expected.runtime.json").exists() or (d / "expected.stateful.json").exists()))
         )
     )
