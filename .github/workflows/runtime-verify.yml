@@ -1,0 +1,95 @@
+name: Runtime verification
+
+# Closes the unverified items from the 04-25 / 04-27 reviews:
+#   - Codex U1 / Claude U3: cold-install + warm-cache idempotence
+#     (delete .a11y-audit-deps, run twice, second run must not re-install)
+#   - Claude U1: live Playwright behavior (real Chromium launch, axe
+#     injection, route handlers, screenshots)
+#
+# The auth flow (Claude U2) needs a seedable test target with credentials
+# and is intentionally out of scope for this workflow.
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Weekly Monday 12:00 UTC — catches upstream drift in axe-core /
+    # Playwright / Chromium that wouldn't fire on a code-change trigger.
+    - cron: "0 12 * * 1"
+  pull_request:
+    paths:
+      - ".agents/skills/a11y-audit/scripts/a11y_runtime.js"
+      - ".agents/skills/a11y-audit/scripts/a11y_stateful.js"
+      - ".agents/skills/a11y-audit/scripts/a11y_runtime_common.js"
+      - ".agents/skills/a11y-audit/fixtures/runtime-*/**"
+      - ".agents/skills/a11y-audit/fixtures/stateful-*/**"
+      - ".github/workflows/runtime-verify.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  fixtures:
+    name: Static fixture suite
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Run fixture suite
+        run: python3 .agents/skills/a11y-audit/fixtures/run_fixtures.py
+
+  live-runtime:
+    name: Live runtime + cold/warm install
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Ensure cold cache (delete .a11y-audit-deps)
+        run: rm -rf .agents/skills/a11y-audit/.a11y-audit-deps
+
+      - name: Cold pass (network available — installs deps + Chromium)
+        id: cold
+        run: |
+          set -o pipefail
+          python3 .agents/skills/a11y-audit/fixtures/run_fixtures.py --live-runtime 2>&1 | tee cold-output.log
+
+      - name: Cold pass actually installed something
+        # Sanity check: a cold run *should* trigger the install. If it
+        # didn't, the cache wasn't actually empty and the warm-pass test
+        # below isn't measuring what we think.
+        run: |
+          if ! grep -qE "Installing (required packages|Playwright Chromium browser)" cold-output.log; then
+            echo "::error::Cold pass produced no install lines — cache was not empty, warm test below is invalid"
+            exit 1
+          fi
+
+      - name: Warm pass (must not trigger any install)
+        run: |
+          set -o pipefail
+          python3 .agents/skills/a11y-audit/fixtures/run_fixtures.py --live-runtime 2>&1 | tee warm-output.log
+          if grep -q "Installing required packages" warm-output.log; then
+            echo "::error::Warm pass triggered an npm install — ensureDeps cache is not idempotent"
+            exit 1
+          fi
+          if grep -q "Installing Playwright Chromium browser" warm-output.log; then
+            echo "::error::Warm pass triggered a Playwright browser install — browser cache is not idempotent"
+            exit 1
+          fi
+
+      - name: Upload run logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: runtime-verify-logs
+          path: |
+            cold-output.log
+            warm-output.log
+          retention-days: 7
