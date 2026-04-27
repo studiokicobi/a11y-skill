@@ -623,13 +623,14 @@ def rule_aria_hidden_focusable(text, path, framework):
         attrs = m.group(2)
         if not ARIA_HIDDEN_TRUE_RE.search(attrs):
             continue
-        # tabindex="-1" + aria-hidden is a consistent pairing. Only flag when
-        # the element is still focusable (no negative tabindex).
-        tabindex_m = TABINDEX_RE.search(attrs)
-        if tabindex_m:
-            value = int(tabindex_m.group(1) or tabindex_m.group(2))
-            if value < 0:
-                continue
+        # tabindex="-1" + aria-hidden is a consistent pairing — the element
+        # is hidden from AT *and* removed from the tab order. Only flag when
+        # the element is still focusable. TABINDEX_RE is anchored to \d+
+        # (it drives the positive-tabindex rule) and never matches a leading
+        # minus, so use NEGATIVE_TABINDEX_RE here. The container companion
+        # rule below already uses this pattern.
+        if NEGATIVE_TABINDEX_RE.search(attrs):
+            continue
         line, col = pos_to_line_col(text, m.start())
         yield Issue(
             rule_id="aria-hidden-focusable",

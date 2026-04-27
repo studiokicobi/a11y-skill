@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head><meta charset="utf-8"><title>aria-hidden + tabindex="-1" element-self</title></head>
+  <body>
+    <!-- H1 negative — element-self with both aria-hidden="true" AND
+         tabindex="-1" is the deliberate "hidden from AT and out of tab
+         order" pattern. Author already paired the two; the rule must
+         skip it. Before the H1 fix, TABINDEX_RE was anchored to \d+
+         and never matched a leading minus, so the negative-tabindex
+         skip branch was dead code and the rule fired here, telling
+         the agent to remove aria-hidden from an already-correct
+         element. -->
+    <button type="button" aria-hidden="true" tabindex="-1">offscreen action</button>
+
+    <!-- H1 negative — same pairing on a non-button focusable element. -->
+    <a href="/x" aria-hidden="true" tabindex="-1">offscreen link</a>
+
+    <!-- H1 negative — JSX-style brace value of the same negative tabindex. -->
+    <button type="button" aria-hidden="true" tabindex={-1}>offscreen jsx</button>
+
+    <!-- H1 positive control — aria-hidden=true with NO tabindex on a
+         focusable element is still a real defect (focusable, but invisible
+         to AT). The rule must continue to fire for this case, otherwise
+         we've over-corrected. -->
+    <button type="button" aria-hidden="true">still focusable</button>
+  </body>
+</html>
