@@ -1484,6 +1484,23 @@ def build_not_checked_findings(detected_at: str) -> List[dict]:
     return findings
 
 
+def _wcag_sort_key(criterion: str) -> tuple:
+    """Numeric tuple for "1.4.13" so 1.4.5 < 1.4.13 (lexicographic compare
+    would put 1.4.13 < 1.4.5). Non-numeric segments fall back to a sentinel
+    that sorts after numerics, preserving stable order for things like
+    "best-practice".
+    """
+    if not criterion:
+        return ((), criterion)
+    parts = []
+    for segment in criterion.split("."):
+        try:
+            parts.append((0, int(segment)))
+        except ValueError:
+            parts.append((1, segment))
+    return (tuple(parts), criterion)
+
+
 def _sort_findings(findings: Iterable[dict]) -> List[dict]:
     order = {group: index for index, group in enumerate(REPORT_GROUPS)}
 
@@ -1493,7 +1510,7 @@ def _sort_findings(findings: Iterable[dict]) -> List[dict]:
             finding["status"] != "open",
             order.get(finding["triage_group"], 99),
             finding["status"],
-            finding["wcag"][0] if finding["wcag"] else "",
+            _wcag_sort_key(finding["wcag"][0] if finding["wcag"] else ""),
             location.get("file", ""),
             location.get("url", ""),
             location.get("line", 0),

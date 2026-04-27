@@ -118,8 +118,8 @@ These WCAG criteria are outside what the scanners can evaluate. The audit above 
 - 1.3.3 — Sensory Characteristics — Non-color sensory cues (shape, size, orientation, sound) are not exercised by the checklist.
 - 1.3.4 — Orientation — Portrait/landscape lock review not automated; 1.4.10 reflow is separate.
 - 1.3.5 — Identify Input Purpose — No autocomplete rule is implemented; user must review `autocomplete` attributes on personal-data fields.
-- 1.4.13 — Content on Hover or Focus — Hoverable/focusable revealed content (tooltips, popovers) is not exercised by the checklist.
 - 1.4.5 — Images of Text — Image-of-text detection is not automated; the checklist doesn't exercise it.
+- 1.4.13 — Content on Hover or Focus — Hoverable/focusable revealed content (tooltips, popovers) is not exercised by the checklist.
 - 2.1.4 — Character Key Shortcuts — Single-character shortcuts are not audited automatically.
 - 2.2.1 — Timing Adjustable — Session-timeout review required.
 - 2.2.2 — Pause, Stop, Hide — Auto-updating content review required.
