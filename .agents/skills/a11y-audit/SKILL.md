@@ -180,11 +180,12 @@ The skill honestly splits coverage into three tiers. Don't claim more than this.
 - 1.3.1 — `<input>` without label; placeholder used as only label
 - 1.4.2 — `<video>` / `<audio>` with autoplay
 - 1.4.3 — Low-contrast CSS hex colors; low-contrast Tailwind text classes
-- 2.1.1 — Non-interactive element (div, span, etc.) with onClick handler
+- 2.1.1 — Non-interactive element (div, span, etc.) with onClick handler (React `onClick`, HTML `onclick`, Vue `@click` / `v-on:click`, Svelte `on:click`, Angular `(click)`)
 - 2.4.3 — Positive `tabindex` values (disrupts natural tab order)
 - 2.4.7 — `outline: none` without a `:focus-visible` replacement nearby
 - 3.1.1 — `<html>` missing `lang` attribute
-- 4.1.2 — Redundant ARIA roles on semantic elements; `aria-hidden="true"` on focusable elements
+- 4.1.1 — Duplicate `id` within a single document (retained as historical continuity; the criterion was removed from WCAG 2.2 but the static signal is still useful — see `references/wcag_coverage.md`)
+- 4.1.2 — Redundant ARIA roles on semantic elements; `aria-hidden="true"` on focusable elements (element-self); `aria-hidden="true"` on a container with a focusable descendant (container variant); icon-only `<button>` / `<a>` with no accessible name
 - best-practice — `target="_blank"` without `rel="noopener noreferrer"`
 
 **Runtime scanner (axe-core via `a11y_runtime.js`):** runs the full axe-core rule set tagged `wcag2a`, `wcag2aa`, `wcag21a`, `wcag21aa`, `wcag22a`, `wcag22aa`, and `best-practice`. This includes computed color contrast, focus management, ARIA state after hydration, landmark regions, heading order, live regions, target size (WCAG 2.2 — 2.5.8), and many more. Axe-incomplete results (checks axe couldn't fully verify) are routed to **Needs your decision** for manual confirmation.

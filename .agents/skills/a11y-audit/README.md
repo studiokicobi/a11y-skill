@@ -138,6 +138,7 @@ Both commands write one artifact directory per run containing:
 - `manifest.json`
 - scanner JSON under `scanners/`
 - screenshots and other evidence under `evidence/`
+- copied input configs under `inputs/` (runtime / journey / token / baseline / status / changed-files), with auth redaction applied to runtime and journey configs (see `Authentication & secret handling`)
 
 The top of `report.md` includes a one-line outcome summary, a snapshot of what was checked, an artifact index, and a mandatory `What to do next` block before the bucketed findings.
 
@@ -355,12 +356,18 @@ Minimal example:
 a11y-audit/
 ├── SKILL.md                              # Agent-facing workflow
 ├── README.md                             # This file
+├── CHANGELOG.md                          # Release notes
 ├── scripts/
+│   ├── cli.py                            # Public orchestrator (audit / ci / promote-baseline)
 │   ├── a11y_scan.py                      # Static scanner (stdlib only)
 │   ├── a11y_runtime.js                   # Runtime scanner (Playwright + axe-core)
 │   ├── a11y_stateful.js                  # Stateful journey scanner (Playwright + axe-core)
+│   ├── a11y_runtime_common.js            # Shared runtime helpers (auth, deps, axe injection)
+│   ├── tokens.py                         # Token-level design system scanner
 │   ├── contrast_checker.py               # WCAG contrast math
-│   └── triage.py                         # Scanner output → triaged report
+│   ├── triage.py                         # Scanner output → normalized report
+│   ├── baseline.py                       # Baseline build / load / compare
+│   └── report.py                         # Markdown + summary rendering
 ├── references/
 │   ├── triage-rules.md                   # Classification logic
 │   ├── wcag-22-criteria.md               # Coverage matrix
@@ -373,7 +380,8 @@ a11y-audit/
 │   ├── fix-patterns-angular.md           # Angular
 │   ├── fix-patterns-svelte.md            # Svelte / SvelteKit
 │   └── fix-patterns-html.md              # Plain HTML / template languages
-└── assets/                               # (reserved for future)
+├── agents/                               # External-agent integration manifests
+└── fixtures/                             # Snapshot fixtures + run_fixtures.py
 ```
 
 ## License
