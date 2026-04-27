@@ -2,10 +2,16 @@
 
 This table shows which WCAG 2.2 Level A and AA success criteria the skill's scanners check, and which rely on the manual checklist.
 
+> **Source of truth.** The deterministic per-criterion matrix lives in
+> [`wcag_coverage.md`](./wcag_coverage.md). When the two disagree,
+> `wcag_coverage.md` wins — it's what `triage.py` reads to render the
+> `Not checked` block, so it directly drives report output.
+
 Legend:
 - `static` — caught by `a11y_scan.py` (source file analysis)
 - `runtime` — caught by `a11y_runtime.js` (axe-core on rendered DOM)
 - `manual` — appears in the manual checklist; requires human testing
+- `out-of-scope` — no rule implemented and no manual checklist item
 
 ## Level A
 
@@ -39,7 +45,7 @@ Legend:
 | 3.3.1 Error Identification | Errors identified in text | runtime (partial), manual |
 | 3.3.2 Labels or Instructions | Inputs have labels | static, runtime |
 | 3.3.7 Redundant Entry (NEW 2.2) | Don't ask for same info twice | manual |
-| 4.1.1 Parsing | Valid, parseable markup | runtime (duplicate ids) |
+| 4.1.1 Parsing | Valid, parseable markup | static (duplicate ids — historical continuity; criterion removed from WCAG 2.2) |
 | 4.1.2 Name, Role, Value | Interactive elements have accessible name and role | static (redundant roles, aria-hidden), runtime |
 
 ## Level AA
@@ -49,7 +55,7 @@ Legend:
 | 1.2.4 Captions (Live) | Live captions for audio | — (manual) |
 | 1.2.5 Audio Description | Video has audio description | — (manual) |
 | 1.3.4 Orientation | Works in both orientations | manual |
-| 1.3.5 Identify Input Purpose | `autocomplete` on common inputs | static (partial) |
+| 1.3.5 Identify Input Purpose | `autocomplete` on common inputs | out-of-scope (no autocomplete rule implemented) |
 | 1.4.3 Contrast (Minimum) | Text 4.5:1, large text 3:1 | static (partial — hex and Tailwind), runtime (full) |
 | 1.4.4 Resize Text | Text resizable to 200% | manual |
 | 1.4.5 Images of Text | Avoid images of text | manual |
@@ -62,7 +68,7 @@ Legend:
 | 2.4.7 Focus Visible | Focus indicator visible | static (outline: none), manual |
 | 2.4.11 Focus Appearance (NEW 2.2) | Focus indicator ≥2px, ≥3:1 contrast | static (outline: none), manual |
 | 2.5.7 Dragging Movements (NEW 2.2) | Drag has single-pointer alternative | manual |
-| 2.5.8 Target Size (NEW 2.2) | Interactive targets ≥24×24px | static (partial), runtime |
+| 2.5.8 Target Size (NEW 2.2) | Interactive targets ≥24×24px | runtime (axe `target-size`) |
 | 3.1.2 Language of Parts | Language changes marked | manual |
 | 3.2.3 Consistent Navigation | Nav consistent across pages | manual |
 | 3.2.4 Consistent Identification | Same function same name | manual |

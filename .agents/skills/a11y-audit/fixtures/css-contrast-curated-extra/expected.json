@@ -1,0 +1,56 @@
+{
+  "framework": "html",
+  "files_scanned": 1,
+  "issue_count": 7,
+  "issues": [
+    {
+      "rule_id": "css-low-contrast",
+      "wcag": "1.4.3",
+      "file": "fixtures/css-contrast-curated-extra/styles.css",
+      "line": 5,
+      "triage_hint": "auto"
+    },
+    {
+      "rule_id": "css-low-contrast",
+      "wcag": "1.4.3",
+      "file": "fixtures/css-contrast-curated-extra/styles.css",
+      "line": 6,
+      "triage_hint": "auto"
+    },
+    {
+      "rule_id": "css-low-contrast",
+      "wcag": "1.4.3",
+      "file": "fixtures/css-contrast-curated-extra/styles.css",
+      "line": 7,
+      "triage_hint": "auto"
+    },
+    {
+      "rule_id": "css-low-contrast",
+      "wcag": "1.4.3",
+      "file": "fixtures/css-contrast-curated-extra/styles.css",
+      "line": 8,
+      "triage_hint": "auto"
+    },
+    {
+      "rule_id": "css-low-contrast",
+      "wcag": "1.4.3",
+      "file": "fixtures/css-contrast-curated-extra/styles.css",
+      "line": 9,
+      "triage_hint": "auto"
+    },
+    {
+      "rule_id": "css-low-contrast",
+      "wcag": "1.4.3",
+      "file": "fixtures/css-contrast-curated-extra/styles.css",
+      "line": 12,
+      "triage_hint": "auto"
+    },
+    {
+      "rule_id": "css-low-contrast",
+      "wcag": "1.4.3",
+      "file": "fixtures/css-contrast-curated-extra/styles.css",
+      "line": 13,
+      "triage_hint": "auto"
+    }
+  ]
+}

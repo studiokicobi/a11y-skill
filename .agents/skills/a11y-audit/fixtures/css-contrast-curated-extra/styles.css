@@ -1,0 +1,18 @@
+/* Codex M6 — colors that are listed in references/contrast-alternatives.md
+   but were missing from CSS_LOW_CONTRAST_RE before the regex was widened.
+   Each rule below should fire as css-low-contrast. */
+
+.darker-gray { color: #888; }
+.even-darker-gray { color: #777; }
+.muted-green { color: #66bb6a; }
+.muted-blue { color: #42a5f5; }
+.muted-red { color: #ef5350; }
+
+/* Six-digit forms of the new gray entries — the regex covers both forms. */
+.gray-888-long { color: #888888; }
+.gray-777-long { color: #777777; }
+
+/* Negative control — a color outside the curated table must NOT fire,
+   even if visually similar. The agent's contract says "do not invent
+   replacement colors outside this table"; the scanner mirrors that. */
+.uncurated { color: #abcdef; }

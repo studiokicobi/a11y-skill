@@ -1303,6 +1303,53 @@ def run_invariant_checks() -> bool:
             print(f"        written:\n{written_plain}")
             ok = False
 
+    # CSS_LOW_CONTRAST_RE must match every hex color in the curated
+    # contrast-alternatives.md table. The doc is loaded into agent context
+    # when proposing a fix; if the scanner can't even detect the color, the
+    # agent is told there's a curated replacement for a color it never sees.
+    contrast_md = (SKILL_ROOT / "references" / "contrast-alternatives.md").read_text(encoding="utf-8")
+    css_section_match = re.search(
+        r"## CSS hex colors[^\n]*\n+\|[^\n]+\|\n\|[\- |]+\|\n((?:\|[^\n]+\n)+)",
+        contrast_md,
+    )
+    if not css_section_match:
+        print("  FAIL invariant: could not locate CSS hex colors table in contrast-alternatives.md")
+        ok = False
+    else:
+        rows = css_section_match.group(1).strip().splitlines()
+        curated_colors = []
+        for row in rows:
+            cells = [c.strip() for c in row.strip().strip("|").split("|")]
+            if not cells:
+                continue
+            # First cell is e.g. "`#aaa` / `#aaaaaa`" or "`#66bb6a`"
+            for token in re.findall(r"`#[0-9a-fA-F]{3,8}`", cells[0]):
+                curated_colors.append(token.strip("`"))
+        scripts_dir = str(SKILL_ROOT / "scripts")
+        if scripts_dir not in sys.path:
+            sys.path.insert(0, scripts_dir)
+        try:
+            from a11y_scan import CSS_LOW_CONTRAST_RE  # type: ignore
+        except ImportError as exc:
+            print(f"  FAIL invariant: could not import CSS_LOW_CONTRAST_RE ({exc})")
+            ok = False
+        else:
+            unmatched = []
+            for color in curated_colors:
+                if not CSS_LOW_CONTRAST_RE.search(f"color: {color};"):
+                    unmatched.append(color)
+            if unmatched:
+                print(
+                    "  FAIL invariant: contrast-alternatives.md lists colors the "
+                    f"scanner can't match: {unmatched}"
+                )
+                ok = False
+            else:
+                print(
+                    "  PASS invariant: CSS_LOW_CONTRAST_RE matches every curated "
+                    f"hex color ({len(curated_colors)} checked)"
+                )
+
     # promote-baseline must appear in `cli.py --help`. SKILL.md routes the
     # "save the baseline" intent through this subcommand, so a regression
     # that hides it (e.g. resurrecting argparse.SUPPRESS) would silently

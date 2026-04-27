@@ -765,8 +765,24 @@ TAILWIND_BAD_TEXT_RE = re.compile(
     re.IGNORECASE,
 )
 
+# Matches any hex color from references/contrast-alternatives.md (the
+# curated replacement table). The list is intentionally small and
+# concrete: any color in the table is known to fail AA on a white
+# background and has a curated replacement, so the rule is "Safe to fix
+# now" eligible. New colors must be added to BOTH this regex AND the
+# replacement table — the run_invariant_checks pass below asserts parity.
 CSS_LOW_CONTRAST_RE = re.compile(
-    r'color\s*:\s*(#[aA][aA][aA](?:[aA][aA][aA])?|#[bB][bB][bB](?:[bB][bB][bB])?|#[9][9][9](?:[9][9][9])?|#ccc(?:ccc)?)\b',
+    r'color\s*:\s*('
+    r'#777(?:777)?'
+    r'|#888(?:888)?'
+    r'|#999(?:999)?'
+    r'|#aaa(?:aaa)?'
+    r'|#bbb(?:bbb)?'
+    r'|#ccc(?:ccc)?'
+    r'|#66bb6a'
+    r'|#42a5f5'
+    r'|#ef5350'
+    r')\b',
     re.IGNORECASE,
 )
 
