@@ -1303,6 +1303,22 @@ def run_invariant_checks() -> bool:
             print(f"        written:\n{written_plain}")
             ok = False
 
+    # promote-baseline must appear in `cli.py --help`. SKILL.md routes the
+    # "save the baseline" intent through this subcommand, so a regression
+    # that hides it (e.g. resurrecting argparse.SUPPRESS) would silently
+    # break agent docs vs CLI surface.
+    help_result = subprocess.run(
+        [sys.executable, str(CLI), "--help"],
+        capture_output=True, text=True, cwd=str(SKILL_ROOT),
+    )
+    if help_result.returncode == 0 and "promote-baseline" in help_result.stdout:
+        print("  PASS invariant: promote-baseline visible in cli.py --help")
+    else:
+        print("  FAIL invariant: promote-baseline missing from cli.py --help")
+        print(f"        exit:   {help_result.returncode}")
+        print(f"        stdout: {help_result.stdout!r}")
+        ok = False
+
     # Pinned runtime dep versions. Floating ranges (^/~/>=/*) on a Chromium-
     # driving package or a rule-defining package would let an unattended
     # install months from now silently change scanner behavior.

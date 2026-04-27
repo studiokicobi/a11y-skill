@@ -727,7 +727,7 @@ def _add_shared_source_args(parser: argparse.ArgumentParser, include_raw: bool, 
 
 def _build_public_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Accessibility audit workflow orchestrator")
-    subparsers = parser.add_subparsers(dest="command", metavar="{audit,ci}")
+    subparsers = parser.add_subparsers(dest="command", metavar="{audit,ci,promote-baseline}")
 
     audit = subparsers.add_parser("audit", help="Run a local accessibility audit and package the results")
     _add_shared_source_args(audit, include_raw=False, include_changed_files=False)
@@ -744,14 +744,16 @@ def _build_public_parser() -> argparse.ArgumentParser:
     ci.add_argument("--fail-on-any-new", action="store_true")
     ci.add_argument("--fail-on-manual-findings", action="store_true")
 
-    promote = subparsers.add_parser("promote-baseline", help=argparse.SUPPRESS)
+    # Promote a previously generated report into a baseline without re-scanning.
+    # SKILL.md routes the "save the baseline" intent here; documenting it
+    # publicly aligns the agent contract with the CLI surface.
+    promote = subparsers.add_parser(
+        "promote-baseline",
+        help="Write a baseline JSON from an existing report (no re-scan)",
+    )
     promote.add_argument("--report", required=True, help="Normalized report JSON")
     promote.add_argument("--baseline-file", required=True, help="Path to write baseline JSON")
     promote.add_argument("--force", action="store_true", help="Overwrite an existing baseline file at --baseline-file")
-    subparsers._choices_actions = [
-        action for action in subparsers._choices_actions
-        if getattr(action, "dest", None) != "promote-baseline"
-    ]
 
     return parser
 

@@ -106,12 +106,19 @@ python3 scripts/cli.py audit \
   --baseline-file .a11y/baseline.json \
   --output-dir .artifacts/a11y/latest
 
-# Save a baseline from the public flow
+# Save a baseline by re-running the audit (re-scans the target)
 python3 scripts/cli.py audit \
   --path . \
   --mode quick \
   --output-dir .artifacts/a11y/latest \
   --write-baseline .a11y/baseline.json
+
+# Promote a previously generated report into a baseline (no re-scan).
+# This is what the SKILL "save the baseline" intent calls.
+python3 scripts/cli.py promote-baseline \
+  --report .artifacts/a11y/latest/report.json \
+  --baseline-file .a11y/baseline.json
+# Pass --force to overwrite an existing baseline at the destination.
 
 # CI / PR workflow
 python3 scripts/cli.py ci \
