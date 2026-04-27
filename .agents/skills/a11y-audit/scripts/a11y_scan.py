@@ -247,16 +247,48 @@ ARIA_HIDDEN_TRUE_RE = re.compile(r'\baria-hidden\s*=\s*["\']true["\']',
                                  re.IGNORECASE)
 ARIA_HIDDEN_FALSE_RE = re.compile(r'\baria-hidden\s*=\s*["\']false["\']',
                                   re.IGNORECASE)
-# Non-greedy match to the first closing tag of the same name. This is
-# intentionally conservative: for `<div aria-hidden="true"><div/><button/></div>`
-# the inner `</div>` ends the match before the button is seen. That produces
-# false negatives on same-tag nesting but avoids false positives when the
-# actual extent of `aria-hidden` isn't resolvable from text alone.
-ARIA_HIDDEN_CONTAINER_RE = re.compile(
-    r'<(\w+)\b([^>]*?\baria-hidden\s*=\s*["\']true["\'][^>]*?)>(.*?)</\1>',
+# Open-tag match for any element with aria-hidden="true". The matching
+# close is found via _find_matching_close_tag below — non-greedy regex was
+# previously used (`(.*?)</\1>`) but it stopped at the first same-name
+# closing tag, missing focusable descendants after a nested same-name
+# element (Codex H2 repro). The depth-balanced search handles same-tag
+# nesting in same-file HTML/JSX text.
+ARIA_HIDDEN_OPEN_RE = re.compile(
+    r'<(\w+)\b([^>]*?\baria-hidden\s*=\s*["\']true["\'][^>]*?)>',
     re.IGNORECASE | re.DOTALL,
 )
 FOCUSABLE_ELEMENT_TAG_NAMES = frozenset({"a", "button", "input", "select", "textarea"})
+
+
+def _find_matching_close_tag(text, tag_name, search_from):
+    """Return (start, end) of the depth-balanced </tag_name> after
+    `search_from`, or None if not found. Treats `<tag ... />` as its own
+    balanced unit. Pure text — assumes well-formed nesting (no real DOM
+    parser); a malformed file may surface as a near-miss but won't loop
+    or crash.
+    """
+    open_re = re.compile(rf'<{re.escape(tag_name)}\b[^>]*?>', re.IGNORECASE | re.DOTALL)
+    close_re = re.compile(rf'</{re.escape(tag_name)}\s*>', re.IGNORECASE)
+    depth = 1
+    pos = search_from
+    while True:
+        next_open = open_re.search(text, pos)
+        next_close = close_re.search(text, pos)
+        if not next_close:
+            return None
+        if next_open and next_open.start() < next_close.start():
+            # Self-closing form `<tag ... />` doesn't open a new scope.
+            open_text = next_open.group(0)
+            if open_text.rstrip()[:-1].rstrip().endswith('/'):
+                pos = next_open.end()
+                continue
+            depth += 1
+            pos = next_open.end()
+        else:
+            depth -= 1
+            if depth == 0:
+                return (next_close.start(), next_close.end())
+            pos = next_close.end()
 
 # Duplicate id detection uses the existing ID_ATTR_RE to collect every
 # id value and its offset within the file.
@@ -667,25 +699,34 @@ def rule_aria_hidden_container_focusable(text, path, framework):
     # (remove aria-hidden on the container vs. add tabindex="-1" on the
     # descendant vs. restructure the subtree) depends on intent, so this
     # routes to needs_input via fix_data["pattern"] = "aria_hidden_container".
-    for m in ARIA_HIDDEN_CONTAINER_RE.finditer(text):
+    for m in ARIA_HIDDEN_OPEN_RE.finditer(text):
         element = m.group(1).lower()
         # The element-self rule already covers focusable tags with
         # aria-hidden="true". Skip to avoid double-emit on the same root cause.
         if element in FOCUSABLE_ELEMENT_TAG_NAMES:
             continue
-        inner = m.group(3)
-        # An `aria-hidden="false"` inside suggests an intentional override on
-        # some descendant. Text-only matching can't tell which descendant is
-        # overridden, so skip the whole container — conservative by design.
-        if ARIA_HIDDEN_FALSE_RE.search(inner):
+        # Depth-balanced close — finds the actual matching closing tag, not
+        # the first same-name close (Codex H2). Without this, a same-tag
+        # nested element (e.g. <div><div/><button/></div>) ends the match
+        # at the inner </div> and the button is missed.
+        close = _find_matching_close_tag(text, element, m.end())
+        if not close:
             continue
+        inner = text[m.end():close[0]]
         descendant_found = False
         for fm in FOCUSABLE_ARIA_HIDDEN_RE.finditer(inner):
             focus_attrs = fm.group(2)
             # tabindex="-1" takes the descendant out of the tab order, so the
             # container's aria-hidden is no longer a keyboard hazard for that
-            # element. Skip the descendant and keep scanning for others.
+            # element.
             if NEGATIVE_TABINDEX_RE.search(focus_attrs):
+                continue
+            # Per-element aria-hidden="false" override: the descendant is
+            # explicitly re-exposed and its focusability is its own concern.
+            # Replaces the prior "any aria-hidden=false anywhere in inner"
+            # short-circuit, which suppressed the whole container even when
+            # the override didn't reach every focusable descendant.
+            if ARIA_HIDDEN_FALSE_RE.search(focus_attrs):
                 continue
             descendant_found = True
             break

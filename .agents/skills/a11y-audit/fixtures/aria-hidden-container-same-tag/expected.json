@@ -1,0 +1,21 @@
+{
+  "framework": "html",
+  "files_scanned": 1,
+  "issue_count": 2,
+  "issues": [
+    {
+      "rule_id": "aria-hidden-focusable",
+      "wcag": "4.1.2",
+      "file": "fixtures/aria-hidden-container-same-tag/index.html",
+      "line": 12,
+      "triage_hint": "input"
+    },
+    {
+      "rule_id": "aria-hidden-focusable",
+      "wcag": "4.1.2",
+      "file": "fixtures/aria-hidden-container-same-tag/index.html",
+      "line": 18,
+      "triage_hint": "input"
+    }
+  ]
+}

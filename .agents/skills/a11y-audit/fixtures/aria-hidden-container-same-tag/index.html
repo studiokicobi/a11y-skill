@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head><meta charset="utf-8"><title>aria-hidden container same-tag nesting</title></head>
+  <body>
+    <!-- Codex H2 positive — focusable descendant after a nested same-name
+         element. Before the fix, ARIA_HIDDEN_CONTAINER_RE used a non-greedy
+         regex `(.*?)</\1>` that stopped at the inner `</div>`, so the
+         button was outside the captured inner text and the rule silently
+         skipped it. Now the matching close is found via depth-balanced
+         search, so the outer `<div aria-hidden="true">` is correctly
+         flagged. -->
+    <div aria-hidden="true">
+      <div class="decorative"></div>
+      <button type="button">Save</button>
+    </div>
+
+    <!-- Codex H2 positive — deeper same-tag nesting (three levels). -->
+    <div aria-hidden="true">
+      <div>
+        <div>marker</div>
+      </div>
+      <a href="/x">deep link</a>
+    </div>
+
+    <!-- Negative control — preserves the existing behavior where a per-
+         element aria-hidden="false" override on the focusable descendant
+         itself opts it back into the AT tree, so the container is not a
+         hazard for that element. The previous rule treated this as a
+         whole-container skip; the new rule scopes the override check to
+         each descendant's own attributes, so the existing fixture
+         expectation still holds. -->
+    <div aria-hidden="true">
+      <span><span>nested non-focusable wrappers</span></span>
+      <button type="button" aria-hidden="false">re-exposed</button>
+    </div>
+  </body>
+</html>
