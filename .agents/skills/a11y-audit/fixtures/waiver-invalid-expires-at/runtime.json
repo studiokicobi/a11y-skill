@@ -1,0 +1,7 @@
+{
+  "scanner": "runtime",
+  "urls": ["http://localhost:3000"],
+  "per_url_counts": {"http://localhost:3000": 0},
+  "issue_count": 0,
+  "issues": []
+}

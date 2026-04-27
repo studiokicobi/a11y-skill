@@ -1283,6 +1283,20 @@ def load_status_records(path_str: Optional[str]) -> List[dict]:
                 "expires_at": waiver.get("expires_at", ""),
             },
         })
+    # Fail closed on unparseable expires_at. An invalid date silently kept
+    # the waiver active forever (apply_status_overrides only reopens when
+    # _parse_iso returns a real datetime older than detected_at), so a typo
+    # like "2026-13-01" became a permanent waiver. Empty / missing dates
+    # remain valid (waiver with no expiration).
+    for record in records:
+        waiver = record.get("waiver") or {}
+        expires_at = waiver.get("expires_at", "")
+        if expires_at and _parse_iso(expires_at) is None:
+            raise ValueError(
+                f"Invalid waiver expires_at {expires_at!r}: "
+                f"must be an ISO-8601 timestamp (e.g. 2026-12-31T00:00:00Z) "
+                f"or empty for no expiration."
+            )
     return records
 
 
@@ -2025,7 +2039,11 @@ def main():
 
     detected_at = args.detected_at or _now_iso()
     output_dir = _output_dir(args.output, args.json_output)
-    status_records = load_status_records(args.status_file)
+    try:
+        status_records = load_status_records(args.status_file)
+    except ValueError as exc:
+        print(f"Status error: {exc}", file=sys.stderr)
+        sys.exit(2)
     report = build_report_data(static_data, runtime_data, stateful_data, token_data, baseline_data, output_dir, detected_at, status_records)
 
     raw_issues = []

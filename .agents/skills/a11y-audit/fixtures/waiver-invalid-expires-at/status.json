@@ -1,0 +1,14 @@
+{
+  "waivers": [
+    {
+      "match": {
+        "rule_id": "target-blank-no-noopener",
+        "file": "fixtures/waiver-active/index.html",
+        "line": 9
+      },
+      "reason": "Typo in date — should fail loudly rather than silently waive forever.",
+      "approved_by": "a11y-lead",
+      "expires_at": "2026-13-01T00:00:00Z"
+    }
+  ]
+}

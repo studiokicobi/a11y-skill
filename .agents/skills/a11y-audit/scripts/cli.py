@@ -771,6 +771,8 @@ def _load_status_or_error(path_str: Optional[str]):
         return None, (2, f"Configuration error: {exc}")
     except json.JSONDecodeError as exc:
         return None, (2, f"Configuration error: {exc}")
+    except ValueError as exc:
+        return None, (2, f"Configuration error: {exc}")
 
 
 def _collect_audit_payloads(args, paths: Dict[str, Path]) -> Dict[str, Optional[dict]]:
