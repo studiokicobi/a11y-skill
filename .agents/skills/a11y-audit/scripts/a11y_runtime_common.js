@@ -195,6 +195,10 @@ function loadConfig(configPath, { required = false, kind = 'config' } = {}) {
   throw new Error(`${label} config files must use .json, .yaml, or .yml.`);
 }
 
+const INLINE_SECRET_HELP =
+  'Use env:VAR_NAME or file:./path (or { env: "VAR_NAME" } / { file: "./path" }) ' +
+  'so the raw value is never embedded in the config file itself.';
+
 function resolveSecretValue(spec, label, baseDir) {
   if (spec == null) {
     throw new Error(`Missing value for ${label}.`);
@@ -215,7 +219,11 @@ function resolveSecretValue(spec, label, baseDir) {
       }
       return fs.readFileSync(secretPath, 'utf-8').trim();
     }
-    return spec;
+    // Reject inline string literals. A raw secret in the config file ends up
+    // in the copied audit artifact and any log line that stringifies the
+    // config. Forcing env:/file: keeps the sensitive value out of the
+    // repo and out of the artifact bundle.
+    throw new Error(`Inline auth secret for ${label} is not allowed. ${INLINE_SECRET_HELP}`);
   }
   if (typeof spec === 'object' && !Array.isArray(spec)) {
     if (spec.env) {
@@ -225,10 +233,13 @@ function resolveSecretValue(spec, label, baseDir) {
       return resolveSecretValue(`file:${spec.file}`, label, baseDir);
     }
     if (Object.prototype.hasOwnProperty.call(spec, 'value')) {
-      return String(spec.value);
+      // `{ value: ... }` is a more explicit form of the same inline-literal
+      // footgun rejected above. Same failure mode (leaks through config
+      // copy + logs), same rejection.
+      throw new Error(`Inline auth secret for ${label} (object "value" form) is not allowed. ${INLINE_SECRET_HELP}`);
     }
   }
-  throw new Error(`Unsupported secret reference for ${label}. Use env:, file:, or { env/file/value }.`);
+  throw new Error(`Unsupported secret reference for ${label}. ${INLINE_SECRET_HELP}`);
 }
 
 function resolveAuth(authConfig, baseDir) {

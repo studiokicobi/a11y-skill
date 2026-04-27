@@ -11,6 +11,7 @@ Legacy flat arguments are still supported for fixture coverage and advanced use.
 
 import argparse
 import json
+import re
 import shutil
 import subprocess
 import sys
@@ -151,12 +152,215 @@ def _ingest_scanner_input(source: Path, dest: Path, scanner: str) -> dict:
     return data
 
 
-def _copy_named_input(source: Optional[str], dest_dir: Path, dest_name: str) -> Optional[str]:
+REDACTION_MARKER = "[REDACTED by a11y-audit]"
+
+# Keys under `auth` (or nested auth-like blocks) that are safe to copy. Anything
+# else defaults to redaction — the allowlist is deliberately narrow because a
+# new field name in a future config version should fail closed. env:/file:
+# references are indirect pointers, not the secret itself, so they are safe.
+_AUTH_SAFE_KEYS = frozenset({
+    "mode",
+    "env",
+    "file",
+    "storage_state_path",
+    "cookies_path",
+    "follow_redirects",
+    # Login-flow shape: URLs and selectors aren't secrets; username/password
+    # within `login` fall through to the generic leaf-value redaction rules.
+    "url",
+    "username_selector",
+    "password_selector",
+    "submit_selector",
+    "success_url",
+    "wait_until",
+})
+
+
+def _redact_auth_subtree(node):
+    """Walk an auth-ish subtree and redact string leaves that aren't indirect
+    references. Structural redaction — only applied to JSON-parsed configs.
+    """
+    if isinstance(node, dict):
+        result = {}
+        for key, value in node.items():
+            lowered = key.lower() if isinstance(key, str) else key
+            if lowered in _AUTH_SAFE_KEYS:
+                # Keep mode/env/file/paths verbatim so the artifact still
+                # explains how the secret WOULD be resolved at runtime.
+                result[key] = value
+            elif isinstance(value, (dict, list)):
+                result[key] = _redact_auth_subtree(value)
+            elif isinstance(value, str) and value.startswith(("env:", "file:")):
+                result[key] = value
+            else:
+                result[key] = REDACTION_MARKER
+        return result
+    if isinstance(node, list):
+        return [_redact_auth_subtree(item) for item in node]
+    return node
+
+
+def _redact_config_text_json(raw: str) -> str:
+    """Parse, redact the `auth` subtree, re-serialize. Preserves a trailing
+    newline if the source had one so file diffs stay minimal.
+    """
+    trailing_newline = raw.endswith("\n")
+    data = json.loads(raw)
+    if isinstance(data, dict) and isinstance(data.get("auth"), (dict, list)):
+        data["auth"] = _redact_auth_subtree(data["auth"])
+    out = json.dumps(data, indent=2)
+    return out + "\n" if trailing_newline else out
+
+
+# Block-style YAML detection: matches the common config shape where `auth:`
+# starts a line and is followed by indented children. Flow-style inline
+# configs (e.g. `runtime: {auth: {...}}` on one line) won't match and will
+# fall through to the verbatim copy — an acceptable limitation, since
+# Path A (`resolveSecretValue` in the JS runtime) is the primary defense
+# and unreadable bytes still fail closed via the read-error branch in
+# `_copy_named_input`.
+_YAML_AUTH_TOPLEVEL_RE = re.compile(r'^\s*auth\s*:', re.MULTILINE)
+
+_YAML_PLACEHOLDER_TEMPLATE = (
+    "# [REDACTED by a11y-audit]\n"
+    "# Original YAML runtime config contained an `auth:` block.\n"
+    "# YAML auth configs are not round-tripped into artifact bundles\n"
+    "# because the skill ships stdlib-only and cannot parse YAML safely\n"
+    "# for structural redaction. Use a JSON runtime config if you need\n"
+    "# full artifact reproducibility.\n"
+    "#\n"
+    "# Original source: {original_source}\n"
+)
+
+
+def _safe_source_label(source_path: Path) -> str:
+    """Repo-relative label when inside cwd, basename otherwise. Avoids
+    leaking absolute machine-specific paths into manifest/placeholder text.
+    """
+    resolved = source_path.resolve()
+    try:
+        return resolved.relative_to(Path.cwd().resolve()).as_posix()
+    except ValueError:
+        return resolved.name
+
+
+# Secondary backstop only. As of H4 the YAML branch of `_copy_named_input`
+# emits a placeholder file rather than attempting in-place redaction. This
+# regex still runs over the placeholder bytes as a paranoid final pass —
+# expected to be a no-op since the placeholder template contains no
+# `auth:` block. Kept callable so future paths that genuinely need
+# best-effort YAML scrubbing have something to reach for; do not rely on
+# it as the primary defense.
+_YAML_AUTH_BLOCK_RE = re.compile(
+    r'(^[^\S\n]*auth\s*:[^\n]*\n)((?:[^\S\n]+[^\n]*\n?)*)',
+    re.MULTILINE,
+)
+_YAML_SENSITIVE_KEY_RE = re.compile(
+    r'^(\s*)([^#\s:][^:\n]*?)\s*:\s*(.*)$',
+)
+
+
+def _redact_config_text_yaml(raw: str) -> str:
+    def redact_block(match: "re.Match[str]") -> str:
+        header = match.group(1)
+        body = match.group(2)
+        redacted_lines = []
+        for line in body.splitlines(keepends=True):
+            stripped = line.rstrip("\n")
+            if not stripped.strip() or stripped.lstrip().startswith("#"):
+                redacted_lines.append(line)
+                continue
+            key_match = _YAML_SENSITIVE_KEY_RE.match(stripped)
+            if not key_match:
+                redacted_lines.append(line)
+                continue
+            indent, key, value = key_match.group(1), key_match.group(2).strip(), key_match.group(3)
+            lowered = key.lower()
+            if lowered in _AUTH_SAFE_KEYS:
+                redacted_lines.append(line)
+                continue
+            if not value:
+                # Nested block header like `headers:` — leave the header
+                # line alone; descendant leaves are still inside this
+                # auth block and get caught on their own lines.
+                redacted_lines.append(line)
+                continue
+            trimmed_value = value.strip()
+            if trimmed_value.startswith("env:") or trimmed_value.startswith("file:"):
+                redacted_lines.append(line)
+                continue
+            newline = "\n" if line.endswith("\n") else ""
+            redacted_lines.append(f'{indent}{key}: "{REDACTION_MARKER}"{newline}')
+        return header + "".join(redacted_lines)
+
+    return _YAML_AUTH_BLOCK_RE.sub(redact_block, raw)
+
+
+def _copy_named_input(source: Optional[str], dest_dir: Path, dest_name: str):
+    """Copy a named input into `dest_dir` with H4 redaction policy.
+
+    Returns:
+        - None when no source.
+        - str (the dest filename) for verbatim/JSON-redacted copies.
+        - dict {copied, mode, original_source, reason} when a YAML auth
+          config triggered placeholder emission. Callers prepend
+          `inputs/` to `copied` when building manifest paths.
+    """
     if not source:
         return None
     source_path = Path(source).resolve()
     suffix = "".join(source_path.suffixes)
     dest_path = dest_dir / f"{dest_name}{suffix}"
+    if dest_name in ("runtime.config", "journey.config"):
+        # Runtime/journey configs may carry auth secrets. Redact (or in the
+        # YAML case, emit a placeholder) before the copy so artifact bundles
+        # can't leak even if a future caller bypasses the JS scanner's
+        # inline-literal rejection.
+        try:
+            raw = source_path.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            raw = None
+        lowered_suffix = suffix.lower()
+        if lowered_suffix.endswith(".json"):
+            if raw is None:
+                shutil.copyfile(source_path, dest_path)
+                return dest_path.name if dest_path.is_file() else None
+            try:
+                redacted = _redact_config_text_json(raw)
+            except (ValueError, json.JSONDecodeError):
+                redacted = raw
+            dest_path.write_text(redacted, encoding="utf-8")
+            return dest_path.name if dest_path.is_file() else None
+        if lowered_suffix.endswith((".yaml", ".yml")):
+            # Stdlib-only constraint: no YAML parser available, so we can't
+            # structurally redact. For block-style `auth:` blocks (and for
+            # any unreadable text) we emit a placeholder file instead.
+            # Auth-free YAML round-trips verbatim.
+            if raw is None or _YAML_AUTH_TOPLEVEL_RE.search(raw):
+                source_label = _safe_source_label(source_path)
+                placeholder = _YAML_PLACEHOLDER_TEMPLATE.format(
+                    original_source=source_label
+                )
+                # Defense-in-depth: regex backstop on the placeholder bytes.
+                # Expected no-op since the template contains no `auth:`.
+                placeholder = _redact_config_text_yaml(placeholder)
+                dest_path.write_text(placeholder, encoding="utf-8")
+                if not dest_path.is_file():
+                    return None
+                return {
+                    "copied": dest_path.name,
+                    "mode": "placeholder",
+                    "original_source": source_label,
+                    "reason": "yaml-auth-not-round-tripped",
+                }
+            dest_path.write_text(raw, encoding="utf-8")
+            return dest_path.name if dest_path.is_file() else None
+        # Other suffixes: copy raw text (or bytes when unreadable as text).
+        if raw is None:
+            shutil.copyfile(source_path, dest_path)
+        else:
+            dest_path.write_text(raw, encoding="utf-8")
+        return dest_path.name if dest_path.is_file() else None
     shutil.copyfile(source_path, dest_path)
     return dest_path.name if dest_path.is_file() else None
 
@@ -617,7 +821,11 @@ def _audit_main(argv: List[str]) -> int:
         (args.status_file, "status", "status_file"),
     ):
         copied = _copy_named_input(source, paths["inputs"], dest_name)
-        if copied:
+        if isinstance(copied, dict):
+            entry = dict(copied)
+            entry["copied"] = f"inputs/{entry['copied']}"
+            input_copies[key] = entry
+        elif copied:
             input_copies[key] = f"inputs/{copied}"
 
     artifact_paths = _artifact_index(paths, payloads)
@@ -722,7 +930,11 @@ def _ci_main(argv: List[str]) -> int:
         (args.changed_files, "changed-files", "changed_files"),
     ):
         copied = _copy_named_input(source, paths["inputs"], dest_name)
-        if copied:
+        if isinstance(copied, dict):
+            entry = dict(copied)
+            entry["copied"] = f"inputs/{entry['copied']}"
+            input_copies[key] = entry
+        elif copied:
             input_copies[key] = f"inputs/{copied}"
 
     artifact_paths = _artifact_index(paths, payloads)

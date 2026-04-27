@@ -250,6 +250,15 @@ auth:
   storage_state_path: .secrets/playwright-auth.json
 ```
 
+> **Artifact reproducibility note.** YAML runtime configs that contain an
+> `auth:` block are not copied verbatim into the artifact bundle's
+> `inputs/` directory — the skill ships stdlib-only and cannot parse YAML
+> safely for structural redaction. A placeholder file is written instead,
+> and `manifest.json` records the original source path. If you need full
+> artifact reproducibility for the runtime config, use JSON
+> (`runtime.config.json`), which is redacted field-by-field via a
+> structural allowlist.
+
 Per-page example:
 
 ```yaml

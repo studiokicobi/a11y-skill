@@ -559,6 +559,123 @@ def run_cli_error_fixture(fixture_dir: Path, update: bool = False) -> bool:
     return ok
 
 
+def run_input_copy_fixture(fixture_dir: Path, update: bool = False) -> bool:
+    """CI-mode invocation focused on artifact-copy redaction policy.
+
+    Spec layout (`input-copy.fixture.json`):
+        {
+          "command": "ci",
+          "runtime": "pre-computed-runtime.json",
+          "runtime_config": "runtime.config.yaml",
+          "no_leak_strings": ["Bearer sk_live_abcdef"]
+        }
+
+    Assertions:
+      - Exit code 0 (no --ci flag, so blockers don't fail).
+      - `inputs/runtime.config.yaml` body matches `_YAML_PLACEHOLDER_TEMPLATE`
+        with the original source path substituted in (template imported from
+        cli.py so a template change updates the test in lockstep).
+      - `manifest.inputs.runtime_config` is a dict with mode=placeholder,
+        the recorded original_source matches the resolved fixture path,
+        and the copied path is `inputs/runtime.config.yaml`.
+      - None of the `no_leak_strings` appear anywhere in the output tree.
+    """
+    name = fixture_dir.name
+    spec_path = fixture_dir / "input-copy.fixture.json"
+    spec = json.loads(spec_path.read_text(encoding="utf-8"))
+
+    runtime_path = (fixture_dir / spec["runtime"]).resolve()
+    runtime_config_path = (fixture_dir / spec["runtime_config"]).resolve()
+    no_leak_strings = spec.get("no_leak_strings", [])
+
+    output_dir = Path(f"/tmp/input-copy-fixture-{name}")
+    if output_dir.exists():
+        shutil.rmtree(output_dir)
+
+    cmd = [
+        sys.executable, str(CLI), "ci",
+        "--runtime", str(runtime_path),
+        "--runtime-config", str(runtime_config_path),
+        "--output-dir", str(output_dir),
+        "--detected-at", FIXED_DETECTED_AT,
+    ]
+    result = subprocess.run(cmd, capture_output=True, text=True, cwd=str(SKILL_ROOT))
+    if result.returncode != 0:
+        print(f"  FAIL {name}: ci command exited {result.returncode}")
+        print(f"        stderr: {result.stderr.strip()}")
+        return False
+
+    scripts_dir = str(SKILL_ROOT / "scripts")
+    if scripts_dir not in sys.path:
+        sys.path.insert(0, scripts_dir)
+    try:
+        from cli import _YAML_PLACEHOLDER_TEMPLATE  # type: ignore
+    except ImportError as exc:
+        print(f"  FAIL {name}: could not import _YAML_PLACEHOLDER_TEMPLATE ({exc})")
+        return False
+
+    try:
+        rel_source = runtime_config_path.relative_to(SKILL_ROOT.resolve()).as_posix()
+    except ValueError:
+        rel_source = runtime_config_path.name
+    expected_placeholder = _YAML_PLACEHOLDER_TEMPLATE.format(original_source=rel_source)
+
+    placeholder_path = output_dir / "inputs" / "runtime.config.yaml"
+    if not placeholder_path.exists():
+        print(f"  FAIL {name}: placeholder file not written at {placeholder_path}")
+        shutil.rmtree(output_dir)
+        return False
+
+    actual_placeholder = placeholder_path.read_text(encoding="utf-8")
+    ok = True
+    if actual_placeholder == expected_placeholder:
+        print(f"  PASS {name}: placeholder body matched template")
+    else:
+        print(f"  FAIL {name}: placeholder body differed from template")
+        print(f"        expected:\n{expected_placeholder}")
+        print(f"        actual:\n{actual_placeholder}")
+        ok = False
+
+    manifest_path = output_dir / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    rc_entry = manifest.get("inputs", {}).get("runtime_config")
+    expected_entry = {
+        "copied": "inputs/runtime.config.yaml",
+        "mode": "placeholder",
+        "original_source": rel_source,
+        "reason": "yaml-auth-not-round-tripped",
+    }
+    if rc_entry == expected_entry:
+        print(f"  PASS {name}: manifest input entry recorded placeholder mode + source")
+    else:
+        print(f"  FAIL {name}: manifest input entry mismatch")
+        print(f"        expected: {expected_entry!r}")
+        print(f"        actual:   {rc_entry!r}")
+        ok = False
+
+    leaked = []
+    for f in output_dir.rglob("*"):
+        if not f.is_file():
+            continue
+        try:
+            text = f.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            continue
+        for s in no_leak_strings:
+            if s in text:
+                leaked.append((f.relative_to(output_dir).as_posix(), s))
+    if leaked:
+        print(f"  FAIL {name}: raw auth value(s) leaked in output:")
+        for path, s in leaked:
+            print(f"        {path}: {s!r}")
+        ok = False
+    elif no_leak_strings:
+        print(f"  PASS {name}: no raw auth values found in output ({len(no_leak_strings)} string(s) checked)")
+
+    shutil.rmtree(output_dir)
+    return ok
+
+
 def run_triage_fixture(fixture_dir: Path, update: bool = False) -> bool:
     """Returns True if the triage fixture passes (or was updated), False on failure."""
     name = fixture_dir.name
@@ -877,6 +994,8 @@ def run_fixture(fixture_dir: Path, update: bool = False) -> bool:
     """Returns True if the fixture passes (or was updated), False on failure."""
     if (fixture_dir / "audit.fixture.json").exists():
         return run_audit_fixture(fixture_dir, update=update)
+    if (fixture_dir / "input-copy.fixture.json").exists():
+        return run_input_copy_fixture(fixture_dir, update=update)
     if (fixture_dir / "cli-error.fixture.json").exists():
         return run_cli_error_fixture(fixture_dir, update=update)
     if (fixture_dir / "cli.fixture").exists() or (fixture_dir / "expected.summary.md").exists() or (fixture_dir / "expected.exit.txt").exists():
@@ -941,12 +1060,140 @@ def run_invariant_checks() -> bool:
 
     # Real web URLs must pass through unchanged — `_repo_relative_path` is
     # only supposed to touch local paths.
+    web_ok = True
     for web in ("http://localhost:3000/page", "https://example.test/x"):
         if _repo_relative_path(web) != web:
             print(f"  FAIL invariant: web URL mutated: {web!r} -> {_repo_relative_path(web)!r}")
             ok = False
-    if ok:
+            web_ok = False
+    if web_ok:
         print("  PASS invariant: http/https URLs pass through unchanged")
+
+    # Artifact-copy redaction (H4 belt-and-braces). The JS scanner rejects
+    # inline auth literals at runtime, but cli.py also copies runtime and
+    # journey configs into `inputs/` — even when the scanner is bypassed
+    # (e.g. `audit ci --runtime pre-computed.json --runtime-config x.yaml`).
+    # These invariants exercise the copy path directly so a future
+    # regression in JSON redaction or YAML placeholder emission fails
+    # the suite.
+    try:
+        from cli import (
+            REDACTION_MARKER,
+            _YAML_PLACEHOLDER_TEMPLATE,
+            _copy_named_input,
+            _redact_config_text_json,
+        )
+    except ImportError as exc:
+        print(f"  FAIL invariant: could not import cli redaction helpers ({exc})")
+        return False
+
+    literal_json = (
+        '{"auth": {"mode": "headers", "headers": '
+        '{"Authorization": "Bearer sk_live_abcdef", "X-Api-Key": "k-123"}}}'
+    )
+    literal_json_out = _redact_config_text_json(literal_json)
+    if (
+        "Bearer sk_live_abcdef" not in literal_json_out
+        and "k-123" not in literal_json_out
+        and REDACTION_MARKER in literal_json_out
+    ):
+        print("  PASS invariant: JSON auth.headers.* literals are redacted on copy")
+    else:
+        print("  FAIL invariant: JSON redaction did not remove literal header values")
+        print(f"        output: {literal_json_out!r}")
+        ok = False
+
+    indirect_json = (
+        '{"auth": {"mode": "headers", "headers": '
+        '{"Authorization": "env:API_TOKEN"}}}'
+    )
+    indirect_json_out = _redact_config_text_json(indirect_json)
+    if "env:API_TOKEN" in indirect_json_out and REDACTION_MARKER not in indirect_json_out:
+        print("  PASS invariant: JSON env:/file: references pass through unredacted")
+    else:
+        print("  FAIL invariant: indirect env: reference was mutated or redacted")
+        print(f"        output: {indirect_json_out!r}")
+        ok = False
+
+    storage_json = (
+        '{"auth": {"mode": "storage_state", '
+        '"storage_state_path": ".secrets/state.json"}}'
+    )
+    storage_json_out = _redact_config_text_json(storage_json)
+    if (
+        ".secrets/state.json" in storage_json_out
+        and "storage_state" in storage_json_out
+        and REDACTION_MARKER not in storage_json_out
+    ):
+        print("  PASS invariant: storage_state mode + path survive redaction")
+    else:
+        print("  FAIL invariant: storage_state fields were mutated")
+        print(f"        output: {storage_json_out!r}")
+        ok = False
+
+    # YAML placeholder emission for auth-containing block-style configs.
+    # Replaces the prior "auth block redacted; non-auth blocks untouched"
+    # invariant — the regex-based redaction is now a secondary backstop,
+    # not the primary defense, so we test the actual policy: placeholder
+    # file written, original source recorded, no raw value retained.
+    import tempfile
+
+    auth_yaml = (
+        "url: https://example.com\n"
+        "auth:\n"
+        "  mode: headers\n"
+        "  headers:\n"
+        "    Authorization: \"Bearer sk_live_abcdef\"\n"
+    )
+    plain_yaml = (
+        "url: https://example.com\n"
+        "defaults:\n"
+        "  wait_until: networkidle\n"
+    )
+
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp_path = Path(tmp)
+        src_auth = tmp_path / "auth.yaml"
+        src_auth.write_text(auth_yaml, encoding="utf-8")
+        dest_auth = tmp_path / "out_auth"
+        dest_auth.mkdir()
+        result = _copy_named_input(str(src_auth), dest_auth, "runtime.config")
+        written_auth = (dest_auth / "runtime.config.yaml").read_text(encoding="utf-8") if (dest_auth / "runtime.config.yaml").exists() else ""
+        # tempfile path lives outside cwd → `_safe_source_label` returns basename.
+        expected_body = _YAML_PLACEHOLDER_TEMPLATE.format(original_source=src_auth.name)
+        if (
+            isinstance(result, dict)
+            and result.get("mode") == "placeholder"
+            and result.get("reason") == "yaml-auth-not-round-tripped"
+            and result.get("copied") == "runtime.config.yaml"
+            and result.get("original_source") == "auth.yaml"
+            and written_auth == expected_body
+            and "Bearer sk_live_abcdef" not in written_auth
+        ):
+            print("  PASS invariant: YAML auth config emits placeholder with recorded source")
+        else:
+            print("  FAIL invariant: YAML placeholder emission did not match expected shape")
+            print(f"        result: {result!r}")
+            print(f"        written:\n{written_auth}")
+            ok = False
+
+        src_plain = tmp_path / "plain.yaml"
+        src_plain.write_text(plain_yaml, encoding="utf-8")
+        dest_plain = tmp_path / "out_plain"
+        dest_plain.mkdir()
+        result_plain = _copy_named_input(str(src_plain), dest_plain, "runtime.config")
+        written_plain = (dest_plain / "runtime.config.yaml").read_text(encoding="utf-8") if (dest_plain / "runtime.config.yaml").exists() else ""
+        if (
+            result_plain == "runtime.config.yaml"
+            and written_plain == plain_yaml
+        ):
+            print("  PASS invariant: auth-free YAML round-trips verbatim into inputs/")
+        else:
+            print("  FAIL invariant: auth-free YAML did not round-trip verbatim")
+            print(f"        result: {result_plain!r}")
+            print(f"        written:\n{written_plain}")
+            ok = False
+
     return ok
 
 

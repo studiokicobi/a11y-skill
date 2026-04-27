@@ -1,0 +1,8 @@
+{
+  "auth": {
+    "mode": "headers",
+    "headers": {
+      "Authorization": { "value": "Bearer sk_live_abcdef" }
+    }
+  }
+}

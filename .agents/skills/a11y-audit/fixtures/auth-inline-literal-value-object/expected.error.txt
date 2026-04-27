@@ -1,0 +1,1 @@
+Inline auth secret for auth.headers.Authorization (object "value" form) is not allowed. Use env:VAR_NAME or file:./path (or { env: "VAR_NAME" } / { file: "./path" }) so the raw value is never embedded in the config file itself.

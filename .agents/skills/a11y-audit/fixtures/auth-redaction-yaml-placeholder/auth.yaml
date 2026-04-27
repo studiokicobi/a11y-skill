@@ -1,0 +1,5 @@
+url: https://example.com
+auth:
+  mode: headers
+  headers:
+    Authorization: "Bearer sk_live_abcdef"
