@@ -1,6 +1,6 @@
 # Fix Patterns — Vue / Nuxt
 
-Load this file only when the detected framework is `vue`. Patterns for applying auto-fixable and human-input violations in Vue SFCs and Nuxt apps.
+Load this file only when the detected framework is `vue`. Patterns for applying **Safe to fix now** and **Needs your decision** violations in Vue SFCs and Nuxt apps.
 
 ## 1.1.1 — Image missing alt
 

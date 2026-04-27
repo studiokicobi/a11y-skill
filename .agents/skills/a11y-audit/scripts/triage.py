@@ -2102,12 +2102,15 @@ def main():
         print(markdown_report)
 
     if args.json_output:
-        Path(args.json_output).write_text(json.dumps(report, indent=2), encoding="utf-8")
+        # Trailing newline matches cli.py / baseline.py so byte-for-byte
+        # comparisons across entrypoints (CI diff, reproducibility check)
+        # don't see false drift.
+        Path(args.json_output).write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
         print(f"JSON report written to {args.json_output}", file=sys.stderr)
 
     if args.write_baseline:
         baseline_output = build_baseline(report)
-        Path(args.write_baseline).write_text(json.dumps(baseline_output, indent=2), encoding="utf-8")
+        Path(args.write_baseline).write_text(json.dumps(baseline_output, indent=2) + "\n", encoding="utf-8")
         print(f"Baseline written to {args.write_baseline}", file=sys.stderr)
 
 

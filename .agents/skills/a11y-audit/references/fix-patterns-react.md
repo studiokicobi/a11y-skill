@@ -1,6 +1,6 @@
 # Fix Patterns — React / Next.js
 
-Load this file only when the detected framework is `react` or `nextjs`. Framework-specific patterns for applying the auto-fixable and human-input violations.
+Load this file only when the detected framework is `react` or `nextjs`. Framework-specific patterns for applying the **Safe to fix now** and **Needs your decision** violations.
 
 ## 1.1.1 — Image missing alt
 
