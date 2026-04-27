@@ -1,5 +1,5 @@
 {
-  "schema_version": "2.5.0",
+  "schema_version": "1.0",
   "generated_at": "2026-01-02T03:04:05Z",
   "target": "fixtures/status-history",
   "framework": "html",

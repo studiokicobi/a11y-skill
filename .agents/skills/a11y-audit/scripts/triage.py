@@ -29,6 +29,15 @@ from report import build_markdown_report, build_outcome_summary
 
 
 SCANNER_VERSION = "2.5.0"
+# Bump SCHEMA_VERSION only when the normalized report shape changes in a way
+# downstream consumers must adapt to (added required fields, removed fields,
+# changed types). Behavior changes that don't touch the JSON shape — new
+# rules, fix-template wording, scanner regex tweaks — bump SCANNER_VERSION
+# and leave SCHEMA_VERSION alone. Any SCHEMA_VERSION bump needs a CHANGELOG
+# migration note. Decoupled from SCANNER_VERSION because conflating them
+# made every scanner-behavior bump look like a schema-incompatible
+# baseline mismatch.
+SCHEMA_VERSION = "1.0"
 STANDARD = "WCAG 2.2 Level AA"
 DEFAULT_CONFIDENCE = "medium"
 REPORT_GROUPS = ("autofix", "needs_input", "manual_review", "not_checked")
@@ -1675,7 +1684,7 @@ def build_report_data(
     )
 
     report = {
-        "schema_version": SCANNER_VERSION,
+        "schema_version": SCHEMA_VERSION,
         "generated_at": detected_at,
         "target": target or "(unspecified)",
         "framework": framework,
