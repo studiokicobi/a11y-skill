@@ -1303,6 +1303,43 @@ def run_invariant_checks() -> bool:
             print(f"        written:\n{written_plain}")
             ok = False
 
+    # Pinned runtime dep versions. Floating ranges (^/~/>=/*) on a Chromium-
+    # driving package or a rule-defining package would let an unattended
+    # install months from now silently change scanner behavior.
+    runtime_common = (SKILL_ROOT / "scripts" / "a11y_runtime_common.js").read_text(encoding="utf-8")
+    pinned_block_match = re.search(
+        r"const\s+PINNED_DEPS\s*=\s*Object\.freeze\(\{([^}]*)\}\)",
+        runtime_common,
+    )
+    if not pinned_block_match:
+        print("  FAIL invariant: PINNED_DEPS const not found in a11y_runtime_common.js")
+        ok = False
+    else:
+        body = pinned_block_match.group(1)
+        entries = re.findall(r"'([^']+)'\s*:\s*'([^']+)'", body)
+        version_map = dict(entries)
+        required_deps = {"playwright", "axe-core", "yaml"}
+        missing = required_deps - version_map.keys()
+        if missing:
+            print(f"  FAIL invariant: PINNED_DEPS missing entries: {sorted(missing)}")
+            ok = False
+        else:
+            exact = re.compile(r"^\d+\.\d+\.\d+(?:[+-][0-9A-Za-z.-]+)?$")
+            floating = [
+                (dep, ver) for dep, ver in version_map.items() if not exact.fullmatch(ver)
+            ]
+            if floating:
+                print(
+                    "  FAIL invariant: PINNED_DEPS has non-exact versions: "
+                    f"{floating}"
+                )
+                ok = False
+            else:
+                print(
+                    "  PASS invariant: PINNED_DEPS has exact versions for "
+                    f"{sorted(required_deps)}"
+                )
+
     return ok
 
 

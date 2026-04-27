@@ -73,15 +73,52 @@ const RUNTIME_AXE_TAGS = [
   'best-practice',
 ];
 
+// Pinned exact versions for the runtime/stateful scanner dependency cache.
+// These are security-relevant: playwright drives a Chromium binary and
+// handles auth state; axe-core's rule definitions determine what we flag.
+// Floating ranges would let an unattended install months from now pick up
+// a major-version bump that changes auth schema, browser binary location,
+// rule behavior, or output shape — and there's no checked-in lockfile to
+// roll back to. Update these intentionally and note the bump in
+// CHANGELOG.md / commit message.
+const PINNED_DEPS = Object.freeze({
+  'playwright': '1.59.1',
+  'axe-core': '4.11.3',
+  'yaml': '2.5.1',
+});
+
+function pinnedSpec(dep) {
+  const version = PINNED_DEPS[dep];
+  if (!version) {
+    throw new Error(
+      `Unknown dependency ${JSON.stringify(dep)}. Add an explicit version ` +
+      `to PINNED_DEPS in a11y_runtime_common.js before installing.`
+    );
+  }
+  return `${dep}@${version}`;
+}
+
 function ensureDepCache() {
   if (!fs.existsSync(DEP_CACHE_DIR)) {
     fs.mkdirSync(DEP_CACHE_DIR, { recursive: true });
   }
   const packageJsonPath = path.join(DEP_CACHE_DIR, 'package.json');
   if (!fs.existsSync(packageJsonPath)) {
+    // Seed the cache manifest with the pinned versions so a manual
+    // `npm install` inside the cache (without going through ensureDeps)
+    // resolves to the same versions we intend.
     fs.writeFileSync(
       packageJsonPath,
-      JSON.stringify({ name: 'a11y-audit-deps', version: '1.0.0', private: true }, null, 2)
+      JSON.stringify(
+        {
+          name: 'a11y-audit-deps',
+          version: '1.0.0',
+          private: true,
+          dependencies: { ...PINNED_DEPS },
+        },
+        null,
+        2
+      ) + '\n'
     );
   }
 }
@@ -101,8 +138,9 @@ function ensureDeps(required) {
     return;
   }
 
-  console.error(`Installing required packages: ${missing.join(', ')}...`);
-  execSync(`npm install --no-audit --no-fund --loglevel=error ${missing.join(' ')}`, {
+  const specs = missing.map(pinnedSpec);
+  console.error(`Installing required packages: ${specs.join(', ')}...`);
+  execSync(`npm install --no-audit --no-fund --loglevel=error --save-exact ${specs.join(' ')}`, {
     cwd: DEP_CACHE_DIR,
     stdio: 'inherit',
     env: {
