@@ -11,6 +11,7 @@ Legacy flat arguments are still supported for fixture coverage and advanced use.
 
 import argparse
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -732,7 +733,8 @@ def _build_public_parser() -> argparse.ArgumentParser:
     _add_shared_source_args(audit, include_raw=False, include_changed_files=False)
     audit.add_argument("--mode", choices=("quick", "full"), default="quick")
     audit.add_argument("--write-baseline", type=str, help="Optional path to write a baseline JSON")
-    audit.add_argument("--update-baseline", action="store_true", help="Write a fresh baseline back to --baseline-file")
+    audit.add_argument("--update-baseline", action="store_true", help="Write a fresh baseline back to --baseline-file (implicit overwrite)")
+    audit.add_argument("--force-baseline", action="store_true", help="Overwrite an existing file at --write-baseline (no effect with --update-baseline, which always overwrites)")
 
     ci = subparsers.add_parser("ci", help="Run CI/PR-friendly audit output with deterministic exit codes")
     _add_shared_source_args(ci, include_raw=True, include_changed_files=True)
@@ -745,12 +747,45 @@ def _build_public_parser() -> argparse.ArgumentParser:
     promote = subparsers.add_parser("promote-baseline", help=argparse.SUPPRESS)
     promote.add_argument("--report", required=True, help="Normalized report JSON")
     promote.add_argument("--baseline-file", required=True, help="Path to write baseline JSON")
+    promote.add_argument("--force", action="store_true", help="Overwrite an existing baseline file at --baseline-file")
     subparsers._choices_actions = [
         action for action in subparsers._choices_actions
         if getattr(action, "dest", None) != "promote-baseline"
     ]
 
     return parser
+
+
+def _atomic_write_text(path: Path, content: str) -> None:
+    """Write `content` to `path` via a sibling tempfile + os.replace so a
+    SIGKILL or disk-full mid-write cannot leave a half-written baseline.
+    The dot-prefix on the tempfile keeps it out of plain `ls` output if
+    something does interrupt the rename.
+    """
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(f".{path.name}.tmp")
+    tmp.write_text(content, encoding="utf-8")
+    os.replace(tmp, path)
+
+
+def _write_baseline_or_error(path: Path, payload: dict, *, force: bool):
+    """Atomic + overwrite-guarded baseline write. Returns None on success or
+    a (exit_code, message) tuple on failure. force=True is intended only
+    for paths where the user has explicitly opted in (audit --update-baseline,
+    or an explicit --force / --force-baseline flag).
+    """
+    if path.exists() and not force:
+        return (
+            2,
+            f"Configuration error: baseline file already exists at {path}. "
+            f"Pass --force (promote-baseline) or --force-baseline (audit) "
+            f"to overwrite, or pick a new path.",
+        )
+    try:
+        _atomic_write_text(path, json.dumps(payload, indent=2) + "\n")
+    except OSError as exc:
+        return (2, f"Configuration error: could not write baseline at {path}: {exc}")
+    return None
 
 
 def _load_baseline_or_error(path_str: Optional[str]):
@@ -923,20 +958,31 @@ def _audit_main(argv: List[str]) -> int:
     _write_outputs(paths, outputs["markdown"], outputs["report"], outputs["summary"])
 
     baseline_output_path = None
+    # --update-baseline carries an implicit overwrite intent because the user
+    # explicitly chose to rewrite the file pointed at by --baseline-file.
+    # --write-baseline points at a (possibly new) destination, so a stray
+    # invocation should not silently clobber an existing file there.
+    baseline_force = False
     if args.write_baseline:
         baseline_output_path = Path(args.write_baseline).resolve()
+        baseline_force = args.force_baseline
     elif args.update_baseline:
         if not args.baseline_file:
             print("Configuration error: --update-baseline requires --baseline-file", file=sys.stderr)
             return 2
         baseline_output_path = Path(args.baseline_file).resolve()
+        baseline_force = True
 
     baseline_output_display = None
     if baseline_output_path:
-        baseline_output_path.write_text(
-            json.dumps(build_baseline(outputs["report"]), indent=2) + "\n",
-            encoding="utf-8",
+        write_err = _write_baseline_or_error(
+            baseline_output_path,
+            build_baseline(outputs["report"]),
+            force=baseline_force,
         )
+        if write_err:
+            print(write_err[1], file=sys.stderr)
+            return write_err[0]
         baseline_output_display = _display_path(baseline_output_path)
 
     outcome_summary = outputs["outcome_summary"]
@@ -1051,9 +1097,31 @@ def _ci_main(argv: List[str]) -> int:
 def _promote_baseline_main(argv: List[str]) -> int:
     parser = _build_public_parser()
     args = parser.parse_args(argv)
-    report = json.loads(Path(args.report).read_text(encoding="utf-8"))
+    report_path = Path(args.report)
+    try:
+        report = json.loads(report_path.read_text(encoding="utf-8"))
+    except FileNotFoundError as exc:
+        print(f"Configuration error: {exc}", file=sys.stderr)
+        return 2
+    except json.JSONDecodeError as exc:
+        print(
+            f"Configuration error: invalid JSON in --report {args.report}: {exc}",
+            file=sys.stderr,
+        )
+        return 2
+    except OSError as exc:
+        print(f"Configuration error: {exc}", file=sys.stderr)
+        return 2
+
     baseline = build_baseline(report)
-    Path(args.baseline_file).write_text(json.dumps(baseline, indent=2) + "\n", encoding="utf-8")
+    write_err = _write_baseline_or_error(
+        Path(args.baseline_file).resolve(),
+        baseline,
+        force=args.force,
+    )
+    if write_err:
+        print(write_err[1], file=sys.stderr)
+        return write_err[0]
     print(f"Baseline written to {args.baseline_file}")
     return 0
 

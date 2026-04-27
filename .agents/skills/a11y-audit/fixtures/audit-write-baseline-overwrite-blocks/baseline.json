@@ -1,0 +1,8 @@
+{
+  "schema_version": "1.0",
+  "fingerprint_version": "1.0",
+  "generated_at": "2026-01-01T00:00:00Z",
+  "target": "fixtures/audit-write-baseline-overwrite-blocks",
+  "framework": "html",
+  "records": []
+}

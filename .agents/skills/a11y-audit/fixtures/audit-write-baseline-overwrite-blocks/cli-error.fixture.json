@@ -1,0 +1,3 @@
+{
+  "args": ["audit", "--path", "./", "--write-baseline", "./baseline.json"]
+}

@@ -501,10 +501,15 @@ def run_cli_error_fixture(fixture_dir: Path, update: bool = False) -> bool:
         shutil.rmtree(output_dir)
 
     cmd = [sys.executable, str(CLI), *resolved_args]
-    if "--output-dir" not in raw_args:
-        cmd.extend(["--output-dir", str(output_dir)])
-    if "--detected-at" not in raw_args:
-        cmd.extend(["--detected-at", FIXED_DETECTED_AT])
+    # Auto-inject --output-dir / --detected-at only for subcommands that
+    # accept them (audit / ci). promote-baseline doesn't take either, and
+    # injecting them would mask the real failure with an argparse error.
+    subcommand = raw_args[0] if raw_args else None
+    if subcommand in ("audit", "ci"):
+        if "--output-dir" not in raw_args:
+            cmd.extend(["--output-dir", str(output_dir)])
+        if "--detected-at" not in raw_args:
+            cmd.extend(["--detected-at", FIXED_DETECTED_AT])
 
     result = subprocess.run(cmd, capture_output=True, text=True, cwd=str(SKILL_ROOT))
     actual_exit = result.returncode

@@ -1,0 +1,3 @@
+{
+  "args": ["promote-baseline", "--report", "./report.json", "--baseline-file", "./baseline.json"]
+}
