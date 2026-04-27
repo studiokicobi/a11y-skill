@@ -163,12 +163,25 @@ CLICKABLE_NON_INTERACTIVE_RE = re.compile(
     re.IGNORECASE | re.DOTALL,
 )
 # Click handlers across frameworks:
-#   React/Vue:  onClick={...}, onclick="..."
-#   Svelte:     on:click={...}
-#   Angular:    (click)="..."
-# The rule matches any of these in an element's attribute body.
+#   React:     onClick={...}
+#   HTML:      onclick="..."
+#   Vue:       @click="...", @click.prevent / @click.stop / @click.capture / etc.
+#              v-on:click="..." (long form)
+#   Svelte:    on:click={...}
+#   Angular:   (click)="..."
+# The rule matches any of these in an element's attribute body. Vue's @click
+# was previously missing — the canonical Vue example in fix-patterns-vue.md
+# uses @click, so without this branch the scanner silently couldn't find the
+# issues those examples are meant to remediate. Modifier syntax (@click.stop,
+# @click.prevent) is also covered.
 ON_CLICK_RE = re.compile(
-    r"(?:\bon[Cc]lick\s*=|\bon:click\s*=|\(click\)\s*=)",
+    r"(?:"
+    r"\bon[Cc]lick\s*="
+    r"|\bon:click\s*="
+    r"|\bv-on:click(?:\.[\w]+)*\s*="
+    r"|@click(?:\.[\w]+)*\s*="
+    r"|\(click\)\s*="
+    r")",
     re.IGNORECASE,
 )
 # Interactive ARIA roles that make a non-semantic element keyboard-focusable

@@ -1,0 +1,35 @@
+{
+  "framework": "vue",
+  "files_scanned": 1,
+  "issue_count": 4,
+  "issues": [
+    {
+      "rule_id": "clickable-div",
+      "wcag": "2.1.1",
+      "file": "fixtures/vue-events/Component.vue",
+      "line": 3,
+      "triage_hint": "input"
+    },
+    {
+      "rule_id": "clickable-div",
+      "wcag": "2.1.1",
+      "file": "fixtures/vue-events/Component.vue",
+      "line": 6,
+      "triage_hint": "input"
+    },
+    {
+      "rule_id": "clickable-div",
+      "wcag": "2.1.1",
+      "file": "fixtures/vue-events/Component.vue",
+      "line": 9,
+      "triage_hint": "input"
+    },
+    {
+      "rule_id": "clickable-div",
+      "wcag": "2.1.1",
+      "file": "fixtures/vue-events/Component.vue",
+      "line": 12,
+      "triage_hint": "input"
+    }
+  ]
+}
