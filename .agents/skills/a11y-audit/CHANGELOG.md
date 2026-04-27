@@ -1,5 +1,15 @@
 # Changelog
 
+> **Note on currency.** Entries below cover the 0.1.0 and 0.2.0 milestones.
+> Substantive scanner / orchestrator / docs changes since then live in
+> `git log` rather than this file — see the commit history under
+> `.agents/skills/a11y-audit/` for the M3–M8 line of work (Playwright
+> migration, token scanner, baseline + waiver lifecycle, source mapping,
+> CI mode, unified `cli.py` orchestrator, auth redaction). The internal
+> `SCANNER_VERSION` constant in `scripts/triage.py` advances independently
+> as scanner behavior changes; `SCHEMA_VERSION` is a separate constant
+> that bumps only on report-shape changes.
+
 ## 0.2.0 — Review response
 
 Addressed issues surfaced in a detailed code review.
@@ -82,7 +92,8 @@ Addressed issues surfaced in a detailed code review.
   non-interactive elements, ARIA, focus indicators, contrast, forms, lang
   attribute, autoplay, tabindex.
 - Runtime scanner (Node + Puppeteer + axe-core) with auto-install of
-  dependencies.
+  dependencies. (Migrated to Playwright in a later milestone — see
+  `git log scripts/a11y_runtime.js`.)
 - Contrast checker with WCAG 2.2 math and curated accessible alternatives.
 - Triage engine grouping findings by fix autonomy: auto-fixable, needs
   human input, manual checklist, not checked.
