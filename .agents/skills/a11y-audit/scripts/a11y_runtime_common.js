@@ -30,6 +30,13 @@ const { execSync } = require('child_process');
 const DEP_CACHE_DIR = path.join(__dirname, '..', '.a11y-audit-deps');
 const BROWSERS_DIR = path.join(DEP_CACHE_DIR, 'ms-playwright');
 
+// Playwright snapshots its browser registry at require-time, so the env var
+// must be set before the parent process ever runs `requireFromCache('playwright')`.
+// Setting it later (e.g., inside ensurePlaywrightBrowser) only reaches the
+// install subprocess — the parent's chromium.launch() keeps looking under the
+// default ~/.cache/ms-playwright and fails on a cold install. CI run 25671366686.
+process.env.PLAYWRIGHT_BROWSERS_PATH = BROWSERS_DIR;
+
 // A `require` bound to the cache dir's package.json. Node resolves packages
 // relative to the file that owns the `require`, so mutating `module.paths`
 // inside this common module would not help the caller modules reach

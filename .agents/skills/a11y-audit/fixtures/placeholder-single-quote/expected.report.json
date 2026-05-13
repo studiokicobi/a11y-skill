@@ -80,7 +80,7 @@
   },
   "findings": [
     {
-      "id": "5bf414c77653",
+      "id": "f7dd9f6551ab",
       "rule_id": "input-placeholder-as-label",
       "title": "Placeholder used as only label",
       "wcag": [
@@ -124,7 +124,7 @@
         "diff": "```diff\n- <input type='email' name='contact_email' placeholder='Email'>\n+ <label for=\"contact-email-6\">Email</label>\n+ <input id=\"contact-email-6\" type='email' name='contact_email' placeholder='Email'>\n```",
         "notes": ""
       },
-      "fingerprint": "input-placeholder-as-label|.agents/skills/a11y-audit/fixtures/placeholder-single-quote/form.html|name|contact_email",
+      "fingerprint": "input-placeholder-as-label|fixtures/placeholder-single-quote/form.html|name|contact_email",
       "confirmed_by": [
         "static"
       ],

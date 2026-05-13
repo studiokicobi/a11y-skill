@@ -80,7 +80,7 @@
   },
   "findings": [
     {
-      "id": "25e2ee294c89",
+      "id": "4ae7a74c6d16",
       "rule_id": "target-blank-no-noopener",
       "title": "target=\"_blank\" without rel=\"noopener\"",
       "wcag": [
@@ -124,7 +124,7 @@
         "diff": "```diff\n- <a href=\"https://example.com\" target = \"_blank\">\n+ <a href=\"https://example.com\" target = \"_blank\" rel=\"noopener noreferrer\">\n```",
         "notes": ""
       },
-      "fingerprint": "target-blank-no-noopener|.agents/skills/a11y-audit/fixtures/target-blank-spaced/links.html|line|line-5",
+      "fingerprint": "target-blank-no-noopener|fixtures/target-blank-spaced/links.html|line|line-5",
       "confirmed_by": [
         "static"
       ],
@@ -137,7 +137,7 @@
       }
     },
     {
-      "id": "75b9ea6db51a",
+      "id": "aae632a807dd",
       "rule_id": "target-blank-no-noopener",
       "title": "target=\"_blank\" without rel=\"noopener\"",
       "wcag": [
@@ -181,7 +181,7 @@
         "diff": "```diff\n- <a href=\"https://other.test\" target=\"_blank\" rel=\"nofollow\">\n+ <a href=\"https://other.test\" target=\"_blank\" rel=\"nofollow noopener noreferrer\">\n```",
         "notes": ""
       },
-      "fingerprint": "target-blank-no-noopener|.agents/skills/a11y-audit/fixtures/target-blank-spaced/links.html|line|line-6",
+      "fingerprint": "target-blank-no-noopener|fixtures/target-blank-spaced/links.html|line|line-6",
       "confirmed_by": [
         "static"
       ],

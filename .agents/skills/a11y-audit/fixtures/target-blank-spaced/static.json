@@ -1,5 +1,5 @@
 {
-  "target": "/Users/colin/Sites/a11y-skill/.agents/skills/a11y-audit/fixtures/target-blank-spaced",
+  "target": "fixtures/target-blank-spaced",
   "framework": "html",
   "files_scanned": 1,
   "issue_count": 2,
@@ -7,7 +7,7 @@
     {
       "rule_id": "target-blank-no-noopener",
       "wcag": "best-practice",
-      "file": "/Users/colin/Sites/a11y-skill/.agents/skills/a11y-audit/fixtures/target-blank-spaced/links.html",
+      "file": "fixtures/target-blank-spaced/links.html",
       "line": 5,
       "col": 3,
       "snippet": "<a href=\"https://example.com\" target = \"_blank\">",
@@ -21,7 +21,7 @@
     {
       "rule_id": "target-blank-no-noopener",
       "wcag": "best-practice",
-      "file": "/Users/colin/Sites/a11y-skill/.agents/skills/a11y-audit/fixtures/target-blank-spaced/links.html",
+      "file": "fixtures/target-blank-spaced/links.html",
       "line": 6,
       "col": 3,
       "snippet": "<a href=\"https://other.test\" target=\"_blank\" rel=\"nofollow\">",

@@ -1,5 +1,5 @@
 {
-  "target": "/Users/colin/Sites/a11y-skill/.agents/skills/a11y-audit/fixtures/tailwind-contrast-unmapped",
+  "target": "fixtures/tailwind-contrast-unmapped",
   "framework": "react",
   "files_scanned": 1,
   "issue_count": 1,
@@ -7,7 +7,7 @@
     {
       "rule_id": "tailwind-low-contrast",
       "wcag": "1.4.3",
-      "file": "/Users/colin/Sites/a11y-skill/.agents/skills/a11y-audit/fixtures/tailwind-contrast-unmapped/Badge.tsx",
+      "file": "fixtures/tailwind-contrast-unmapped/Badge.tsx",
       "line": 5,
       "col": 22,
       "snippet": "<span className=\"text-amber-300\">",

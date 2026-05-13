@@ -58,6 +58,26 @@ def normalize(scan_output: dict, fixture_name: str) -> dict:
     return out
 
 
+_INSTALL_LINE_RE = re.compile(
+    r"^Installing (?:required packages|Playwright Chromium browser)"
+)
+
+
+def _echo_install_lines(stderr: Optional[str]) -> None:
+    """Forward cold-install markers from runtime/stateful subprocess stderr.
+
+    `subprocess.run(..., capture_output=True)` swallows stderr on success, but
+    runtime-verify.yml's cold-pass sanity check greps the fixture-runner log for
+    these markers to confirm the cache was actually empty. Without this echo,
+    a successful cold install would look identical to a cache hit.
+    """
+    if not stderr:
+        return
+    for line in stderr.splitlines():
+        if _INSTALL_LINE_RE.match(line):
+            sys.stderr.write(line + "\n")
+
+
 def normalize_report(report: str) -> str:
     normalized = re.sub(r"(\*\*Date\*\*: )\d{4}-\d{2}-\d{2}", r"\1<DATE>", report)
     return normalized.rstrip()
@@ -352,6 +372,7 @@ def run_runtime_smoke_fixture(fixture_dir: Path, update: bool = False) -> bool:
         cmd.extend(["--screenshot-dir", str(screenshot_dir)])
 
     result = subprocess.run(cmd, capture_output=True, text=True, cwd=str(SKILL_ROOT))
+    _echo_install_lines(result.stderr)
     if result.returncode != 0:
         print(f"  FAIL {name}: runtime scan exited {result.returncode}")
         print(f"        stderr: {result.stderr.strip()}")
@@ -396,6 +417,7 @@ def run_stateful_smoke_fixture(fixture_dir: Path, update: bool = False) -> bool:
         cmd.extend(["--screenshot-dir", str(screenshot_dir)])
 
     result = subprocess.run(cmd, capture_output=True, text=True, cwd=str(SKILL_ROOT))
+    _echo_install_lines(result.stderr)
     if result.returncode != 0:
         print(f"  FAIL {name}: stateful scan exited {result.returncode}")
         print(f"        stderr: {result.stderr.strip()}")

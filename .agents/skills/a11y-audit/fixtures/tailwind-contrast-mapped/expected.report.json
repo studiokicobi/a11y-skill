@@ -80,7 +80,7 @@
   },
   "findings": [
     {
-      "id": "03c95158adbc",
+      "id": "e3dfb20f46c3",
       "rule_id": "tailwind-low-contrast",
       "title": "Low-contrast Tailwind class",
       "wcag": [
@@ -124,7 +124,7 @@
         "diff": "```diff\n- <span className=\"text-red-300\">\n+ <span className=\"text-red-700\">\n```",
         "notes": ""
       },
-      "fingerprint": "tailwind-low-contrast|.agents/skills/a11y-audit/fixtures/tailwind-contrast-mapped/Badge.tsx|line|line-5",
+      "fingerprint": "tailwind-low-contrast|fixtures/tailwind-contrast-mapped/Badge.tsx|line|line-5",
       "confirmed_by": [
         "static"
       ],

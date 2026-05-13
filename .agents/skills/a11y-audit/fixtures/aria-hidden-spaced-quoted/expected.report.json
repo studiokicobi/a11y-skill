@@ -80,7 +80,7 @@
   },
   "findings": [
     {
-      "id": "b200a6408c54",
+      "id": "369532fd6888",
       "rule_id": "aria-hidden-focusable",
       "title": "aria-hidden on focusable element",
       "wcag": [
@@ -124,7 +124,7 @@
         "diff": "```diff\n- <button aria-hidden = 'true' onclick=\"ping()\">\n+ <button onclick=\"ping()\">\n```",
         "notes": ""
       },
-      "fingerprint": "aria-hidden-focusable|.agents/skills/a11y-audit/fixtures/aria-hidden-spaced-quoted/button.html|line|line-5",
+      "fingerprint": "aria-hidden-focusable|fixtures/aria-hidden-spaced-quoted/button.html|line|line-5",
       "confirmed_by": [
         "static"
       ],
