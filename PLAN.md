@@ -33,6 +33,38 @@ This file is the execution plan for the repo.
 - M7 — Source mapping and CI/PR integration
 - M8 — Unified audit UX and report packaging
 
+## Current status — 2026-06-14
+
+The repo is a release candidate for the M0–M8 product surface.
+
+Implemented and validated:
+- M0–M8 are represented in the current source tree under `.agents/skills/a11y-audit/`.
+- The public command surface is `scripts/cli.py audit`, `scripts/cli.py ci`, and `scripts/cli.py promote-baseline`.
+- The lower-level scanner and renderer scripts remain available for fixtures, debugging, and advanced use.
+- Reports use the fix-autonomy buckets **Safe to fix now**, **Needs your decision**, and **Test it yourself**.
+- Runtime and stateful scanning use Playwright + axe-core with cold-install and warm-cache behavior covered by live runtime fixtures.
+- Baselines, waivers, token findings, source-mapping confidence, changed-files CI scope, and PR summaries have fixture coverage.
+
+Validation evidence from the 2026-06-14 release-candidate check:
+- `python3 .agents/skills/a11y-audit/fixtures/run_fixtures.py` — 64 passed, 0 failed.
+- `python3 .agents/skills/a11y-audit/scripts/a11y_scan.py .agents/skills/a11y-audit/fixtures/html-basic --quiet --output /tmp/a11y-static.json` — passed.
+- `node --check .agents/skills/a11y-audit/scripts/a11y_runtime.js` — passed.
+- `node --check .agents/skills/a11y-audit/scripts/a11y_stateful.js` — passed.
+- `python3 .agents/skills/a11y-audit/scripts/cli.py audit --path .agents/skills/a11y-audit/fixtures/html-basic --output-dir /tmp/a11y-audit-smoke --detected-at 2026-01-02T03:04:05Z` — passed.
+- `python3 .agents/skills/a11y-audit/scripts/cli.py ci --runtime .agents/skills/a11y-audit/fixtures/ci-changed-files-blocking/runtime.json --changed-files .agents/skills/a11y-audit/fixtures/ci-changed-files-blocking/changed-files.txt --output-dir /tmp/a11y-ci-smoke --detected-at 2026-01-02T03:04:05Z --ci` — returned the expected blocking result.
+- `python3 .agents/skills/a11y-audit/fixtures/run_fixtures.py --live-runtime` — 68 passed, 0 failed.
+- Cold-cache live runtime check after deleting `.agents/skills/a11y-audit/.a11y-audit-deps` installed pinned packages and Chromium, then passed.
+- Warm-cache live runtime rerun passed without reinstalling.
+
+Release path:
+- Build the distributable archive with `bash scripts/pack.sh dist/a11y-audit.skill`.
+- Publish through the tag-triggered GitHub Actions release workflow in `.github/workflows/release.yml`.
+- Because this clone has no existing local tags, choose the release version intentionally before tagging. `v0.3.0` is the recommended next release version because the checked-in changelog last documents `0.2.0`, and the current tree includes substantial M3–M8 product work.
+
+Next product planning:
+- Do not add new scanner rules or source-mapping techniques until a post-M8 milestone is explicitly defined.
+- Good candidates for the next milestone are release hardening, richer parser-backed static analysis, source-map ingestion, authenticated runtime fixtures, or broader token schema support.
+
 ---
 
 ## M0 — Baseline and repo alignment

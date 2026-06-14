@@ -15,6 +15,10 @@ set -euo pipefail
 repo_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 src="${repo_root}/.agents/skills/a11y-audit"
 out="${1:-${repo_root}/dist/a11y-audit.skill}"
+case "${out}" in
+  /*) ;;
+  *) out="${repo_root}/${out}" ;;
+esac
 
 if [ ! -d "${src}" ]; then
   echo "pack.sh: skill tree not found at ${src}" >&2
@@ -33,6 +37,7 @@ cp -R "${src}" "${staging}/a11y-audit"
 rm -rf "${staging}/a11y-audit/.a11y-audit-deps" \
        "${staging}/a11y-audit/scripts/__pycache__" \
        "${staging}/a11y-audit/fixtures"
+find "${staging}/a11y-audit" -name .DS_Store -delete
 
 (cd "${staging}" && zip -qr "${out}" a11y-audit)
 
