@@ -72,9 +72,13 @@ End users and invoking agents should see the public orchestrator first. Drop to 
 
 A dev change must not regress any of the invariants below — if one needs to change, update `SKILL.md`, this file, and the relevant fixtures in the same change.
 
-After an audit completes, the skill reuses the exact `outcome_body` string produced by the run (printed to stdout and persisted at `manifest.json → outcome.body`). Do not recompute, summarize, or paraphrase it. The canonical wrapper is:
+After an audit completes, the skill reuses the exact `outcome_body` string produced by the run (printed to stdout and persisted at `manifest.json → outcome.body`). Do not recompute, summarize, or paraphrase it. Render the report path as a Markdown file link using an absolute filesystem path. If the CLI prints a relative report path, resolve it against the audited repo before rendering the link. Wrap the link target in angle brackets when the path contains spaces or other Markdown-sensitive characters. The canonical wrapper is:
 
-`Audit complete. {outcome_body} Full report: \`{path}\`. What would you like to do?`
+`Audit complete. {outcome_body} Full report: [report.md]({absolute_path}). What would you like to do?`
+
+For paths with spaces or parentheses, use:
+
+`Audit complete. {outcome_body} Full report: [report.md](<{absolute_path}>). What would you like to do?`
 
 Recognized user-intent summary (authoritative text lives in `SKILL.md`):
 - `apply the safe fixes` / `fix what you can` → patch **Safe to fix now**, rerun the static scan, report the delta only.

@@ -127,9 +127,13 @@ Keep `triage.py`, `report.py`, and `baseline.py` for fixtures, debugging, and ad
 
 ## Conversation contract
 
-After `audit` completes, reuse the exact generated `outcome_body` string from that run. Do not recompute it, summarize it, or paraphrase it. The CLI prints it to stdout as the first line; it is also persisted in `manifest.json` at `outcome.body` so you can reload it from a prior run without rescanning. Wrap it exactly like this:
+After `audit` completes, reuse the exact generated `outcome_body` string from that run. Do not recompute it, summarize it, or paraphrase it. The CLI prints it to stdout as the first line; it is also persisted in `manifest.json` at `outcome.body` so you can reload it from a prior run without rescanning. Render the report path as a Markdown file link using an absolute filesystem path. If the CLI prints a relative report path, resolve it against the audited repo before rendering the link. Wrap the link target in angle brackets when the path contains spaces or other Markdown-sensitive characters. Wrap the response exactly like this:
 
-`Audit complete. {outcome_body} Full report: \`{path}\`. What would you like to do?`
+`Audit complete. {outcome_body} Full report: [report.md]({absolute_path}). What would you like to do?`
+
+For paths with spaces or parentheses, use:
+
+`Audit complete. {outcome_body} Full report: [report.md](<{absolute_path}>). What would you like to do?`
 
 Recognized user intents:
 - `apply the safe fixes` or `fix what you can`: work through **Safe to fix now**, edit files, rerun the static scan, and report only the delta.
