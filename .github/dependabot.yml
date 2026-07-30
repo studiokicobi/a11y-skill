@@ -1,0 +1,43 @@
+# Dependabot version updates.
+#
+# Only github-actions is configured, and that is deliberate — the other two
+# ecosystems you might expect are either invisible or actively unwanted here:
+#
+#   npm  The real runtime manifest is .a11y-audit-deps/package.json, which is
+#        gitignored, so Dependabot cannot see it no matter what is configured.
+#        Those versions live in PINNED_DEPS in a11y_runtime_common.js and are
+#        checked against the advisory database by the npm audit step in
+#        runtime-verify.yml. Do NOT add an npm entry pointing at fixtures/
+#        either: the fixture manifests are named package.fixture.json
+#        precisely so Dependabot stops parsing them (see 4fe9c21), because
+#        they declare deliberately old versions that are never installed.
+#
+#   pip  There is no requirements.txt, pyproject.toml or Pipfile to track.
+#        cli.py and triage.py run on the standard library.
+#
+# So this file exists for one reason: keeping the pinned action refs in
+# .github/workflows/ current, which is otherwise a manual sweep.
+
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    groups:
+      # Minor and patch bumps arrive as one combined PR — routine, low-risk,
+      # and not worth five separate reviews.
+      #
+      # Majors are deliberately left OUT of the group so each one lands as
+      # its own PR. Action majors do carry real breaking changes (setup-node
+      # v5 turned on automatic caching; checkout v7 restricted fork-PR
+      # checkout; setup-python v7 dropped an input), and those need reading
+      # against how this repo actually uses the action, one at a time.
+      actions-minor-patch:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
