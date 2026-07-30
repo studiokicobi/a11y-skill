@@ -20,7 +20,15 @@ jobs:
           bash scripts/pack.sh dist/a11y-audit.skill
 
       - name: Upload release archive
-        uses: softprops/action-gh-release@v3
+        # Pinned to a commit SHA rather than the floating v3 tag. This is the
+        # only third-party action in the repo and it runs in a job with
+        # contents: write — a moved or compromised tag could publish arbitrary
+        # release artifacts under this repo's name. The actions/* steps stay on
+        # major tags: they are first-party and carry a different trust model.
+        #
+        # The trailing comment is load-bearing: Dependabot reads it to know
+        # which version the SHA corresponds to, and updates both together.
+        uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3.0.2
         with:
           files: dist/a11y-audit.skill
           fail_on_unmatched_files: true
