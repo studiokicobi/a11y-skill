@@ -50,7 +50,10 @@ jobs:
           python-version: "3.12"
       - uses: actions/setup-node@v7
         with:
-          node-version: "20"
+          # Node 20 is past end-of-life. This is the version the runtime
+          # scanner is actually verified against, so it should track a
+          # supported LTS rather than the oldest thing that still works.
+          node-version: "22"
 
       - name: Ensure cold cache (delete .a11y-audit-deps)
         run: rm -rf .agents/skills/a11y-audit/.a11y-audit-deps
