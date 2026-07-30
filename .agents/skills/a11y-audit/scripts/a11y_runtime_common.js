@@ -88,10 +88,12 @@ const RUNTIME_AXE_TAGS = [
 // rule behavior, or output shape — and there's no checked-in lockfile to
 // roll back to. Update these intentionally and note the bump in
 // CHANGELOG.md / commit message.
+// yaml is >= 2.8.3 because 2.0.0-2.8.2 are vulnerable to a stack overflow on
+// deeply nested collections (GHSA-48c2-rrv3-qjmp). Do not pin back below that.
 const PINNED_DEPS = Object.freeze({
   'playwright': '1.59.1',
   'axe-core': '4.11.3',
-  'yaml': '2.5.1',
+  'yaml': '2.9.0',
 });
 
 function pinnedSpec(dep) {
@@ -110,42 +112,88 @@ function ensureDepCache() {
     fs.mkdirSync(DEP_CACHE_DIR, { recursive: true });
   }
   const packageJsonPath = path.join(DEP_CACHE_DIR, 'package.json');
-  if (!fs.existsSync(packageJsonPath)) {
-    // Seed the cache manifest with the pinned versions so a manual
-    // `npm install` inside the cache (without going through ensureDeps)
-    // resolves to the same versions we intend.
-    fs.writeFileSync(
-      packageJsonPath,
-      JSON.stringify(
-        {
-          name: 'a11y-audit-deps',
-          version: '1.0.0',
-          private: true,
-          dependencies: { ...PINNED_DEPS },
-        },
-        null,
-        2
-      ) + '\n'
-    );
+
+  // Seed the cache manifest with the pinned versions so a manual
+  // `npm install` inside the cache (without going through ensureDeps)
+  // resolves to the same versions we intend. Rewrite it whenever it drifts
+  // from PINNED_DEPS rather than only when absent: a manifest written before
+  // a pin bump would otherwise keep pinning the *old* version forever, which
+  // silently undoes security bumps for anyone with an existing cache.
+  let existing = null;
+  if (fs.existsSync(packageJsonPath)) {
+    try {
+      existing = JSON.parse(fs.readFileSync(packageJsonPath, 'utf-8'));
+    } catch {
+      existing = null;
+    }
+  }
+
+  const deps = existing && existing.dependencies;
+  const matchesPins =
+    deps && Object.entries(PINNED_DEPS).every(([dep, ver]) => deps[dep] === ver);
+  if (matchesPins) {
+    return;
+  }
+
+  fs.writeFileSync(
+    packageJsonPath,
+    JSON.stringify(
+      {
+        name: 'a11y-audit-deps',
+        version: '1.0.0',
+        private: true,
+        dependencies: { ...PINNED_DEPS },
+      },
+      null,
+      2
+    ) + '\n'
+  );
+}
+
+// Read the installed manifest directly rather than going through
+// requireFromCache.resolve — some packages don't expose ./package.json in
+// their "exports" map, and these are all flat direct deps of the cache.
+function installedVersion(dep) {
+  const manifestPath = path.join(DEP_CACHE_DIR, 'node_modules', dep, 'package.json');
+  try {
+    return JSON.parse(fs.readFileSync(manifestPath, 'utf-8')).version || null;
+  } catch {
+    return null;
   }
 }
 
 function ensureDeps(required) {
   ensureDepCache();
 
-  const missing = [];
+  const stale = [];
   for (const dep of required) {
+    let resolvable = true;
     try {
       requireFromCache.resolve(dep);
     } catch {
-      missing.push(dep);
+      resolvable = false;
+    }
+    if (!resolvable) {
+      stale.push(dep);
+      continue;
+    }
+    // Resolvable is not the same as correct. Checking only for presence means
+    // a cache pins itself: bumping PINNED_DEPS for a security advisory would
+    // never reach a machine that already installed the vulnerable version.
+    const current = installedVersion(dep);
+    if (current !== PINNED_DEPS[dep]) {
+      console.error(
+        `Cached ${dep}@${current || 'unknown'} does not match pinned ` +
+        `${PINNED_DEPS[dep]} — reinstalling.`
+      );
+      stale.push(dep);
     }
   }
-  if (missing.length === 0) {
+  if (stale.length === 0) {
     return;
   }
 
-  const specs = missing.map(pinnedSpec);
+  const specs = stale.map(pinnedSpec);
   console.error(`Installing required packages: ${specs.join(', ')}...`);
   execSync(`npm install --no-audit --no-fund --loglevel=error --save-exact ${specs.join(' ')}`, {
     cwd: DEP_CACHE_DIR,

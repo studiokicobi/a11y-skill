@@ -84,6 +84,16 @@ jobs:
             exit 1
           fi
 
+      - name: Audit dependency cache for known advisories
+        # .a11y-audit-deps/ is gitignored, so Dependabot never sees these
+        # packages — there is no committed manifest for it to scan. This step
+        # is the only thing checking the pinned runtime deps against the
+        # advisory database. Combined with the weekly cron above it also
+        # catches advisories published *after* a pin was set, which is how
+        # GHSA-48c2-rrv3-qjmp (yaml stack overflow) went unnoticed.
+        working-directory: .agents/skills/a11y-audit/.a11y-audit-deps
+        run: npm audit --audit-level=moderate
+
       - name: Upload run logs on failure
         if: failure()
         uses: actions/upload-artifact@v4
