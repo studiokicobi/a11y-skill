@@ -91,8 +91,19 @@ jobs:
         # advisory database. Combined with the weekly cron above it also
         # catches advisories published *after* a pin was set, which is how
         # GHSA-48c2-rrv3-qjmp (yaml stack overflow) went unnoticed.
+        #
+        # Warns rather than fails: an advisory published upstream is not a
+        # defect in the PR being tested, and shouldn't block unrelated work on
+        # the runtime scripts. Trade-off is that this needs to be actively
+        # read — check the run summary's annotations, especially on the
+        # weekly cron run, since a warning leaves the build green.
         working-directory: .agents/skills/a11y-audit/.a11y-audit-deps
-        run: npm audit --audit-level=moderate
+        run: |
+          if npm audit --audit-level=moderate; then
+            echo "No advisories at moderate or above against the pinned runtime deps."
+          else
+            echo "::warning title=Runtime dependency advisory::npm audit reported moderate or higher advisories against the pinned runtime deps. Not failing the build — review the step log and bump PINNED_DEPS in a11y_runtime_common.js if warranted."
+          fi
 
       - name: Upload run logs on failure
         if: failure()
